@@ -32,10 +32,6 @@ This will start the application along with the mysql database using docker compo
 # Admin Credentials
 > Email: super.admin@test.com || Password: 12345678
 
-## Demo
-![Purchase Request](public/images/screenshot.jpg)
-**Live Demo:** will update soon
-
 ## Purchase Request Features
 
 - **Products Management & Barcode Printing**
