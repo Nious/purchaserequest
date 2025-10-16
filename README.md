@@ -36,12 +36,8 @@ This will start the application along with the mysql database using docker compo
 
 - **Products Management & Barcode Printing**
 - **Stock Management**
-- **Make Quotation & Send Via Email**
 - **Purchase Management**
 - **Sale Management**
-- **Purchase & Sale Return Management**
-- **Expense Management**
-- **Customer & Supplier Management**
 - **User Management (Roles & Permissions)**
 - **Product Multiple Images**
 - **Multiple Currency Settings**
