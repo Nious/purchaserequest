@@ -33,3 +33,7 @@ Homestead.json
 /.idea
 /.vscode
 docker-compose.override.yml
+<<<<<<< HEAD
+=======
+
+>>>>>>> origin/main
