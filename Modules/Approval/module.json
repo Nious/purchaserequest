@@ -1,0 +1,13 @@
+{
+    "name": "Approval",
+    "alias": "approval",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Approval\\Providers\\ApprovalServiceProvider"
+    ],
+    "aliases": {},
+    "files": [],
+    "requires": []
+}
