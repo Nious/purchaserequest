@@ -35,29 +35,60 @@ class ProductCart extends Component
         $this->cart_instance = $cartInstance;
         $this->budget_id = $budgetId;
 
+        // === Jika sedang edit purchase ===
         if ($data) {
             $this->data = $data;
+            $this->global_discount = $data->discount_percentage ?? 0;
+            $this->global_tax = $data->tax_percentage ?? 0;
+            $this->shipping = $data->shipping_amount ?? 0;
 
-            $this->global_discount = $data->discount_percentage;
-            $this->global_tax = $data->tax_percentage;
-            $this->shipping = $data->shipping_amount;
+            // Bersihkan cart lama agar tidak bentrok
+            Cart::instance($this->cart_instance)->destroy();
 
-            $this->updatedGlobalTax();
-            $this->updatedGlobalDiscount();
+            // Pastikan relasi purchaseDetails tersedia
+            if (method_exists($data, 'purchaseDetails')) {
+                foreach ($data->purchaseDetails as $detail) {
+                    $product = $detail->product;
 
+                    // ✅ Hitung ulang subtotal agar tidak kosong
+                    $sub_total = $detail->unit_price * $detail->quantity;
+
+                    Cart::instance($this->cart_instance)->add([
+                        'id'      => $product->id,
+                        'name'    => $product->product_name,
+                        'qty'     => $detail->quantity,
+                        'price'   => $detail->unit_price,
+                        'weight'  => 1,
+                        'options' => [
+                            'code'                  => $product->product_code ?? '',
+                            'stock'                 => $product->product_quantity ?? 0,
+                            'unit'                  => $product->product_unit ?? '-', // ✅ UOM muncul
+                            'unit_price'            => $detail->unit_price,
+                            'sub_total'             => $sub_total, // ✅ Subtotal muncul
+                            'product_discount'      => $detail->discount ?? 0,
+                            'product_discount_type' => $detail->discount_type ?? 'fixed',
+                            'date'                  => $data->date ?? now()->format('Y-m-d'),
+                        ]
+                    ]);
+                }
+            }
+
+            // Set nilai variabel Livewire dari cart
             $cart_items = Cart::instance($this->cart_instance)->content();
-
             foreach ($cart_items as $cart_item) {
-                $this->check_quantity[$cart_item->id] = [$cart_item->options->stock];
+                $this->check_quantity[$cart_item->id] = $cart_item->options->stock;
                 $this->quantity[$cart_item->id] = $cart_item->qty;
                 $this->unit_price[$cart_item->id] = $cart_item->price;
                 $this->discount_type[$cart_item->id] = $cart_item->options->product_discount_type;
-                $this->item_discount[$cart_item->id] =
-                    $cart_item->options->product_discount_type == 'fixed'
-                        ? $cart_item->options->product_discount
-                        : round(100 * ($cart_item->options->product_discount / $cart_item->price));
+                $this->item_discount[$cart_item->id] = $cart_item->options->product_discount;
             }
-        } else {
+
+            // ✅ Pastikan global tax & discount diterapkan
+            $this->updatedGlobalDiscount();
+            $this->updatedGlobalTax();
+        } 
+        // === Jika create baru ===
+        else {
             $this->global_discount = 0;
             $this->global_tax = 0;
             $this->shipping = 0;
@@ -77,66 +108,72 @@ class ProductCart extends Component
 
         return view('livewire.product-cart', [
             'cart_items' => $cart_items,
-            'grand_total' => $this->grand_total,
-            'budget' => $this->budget,
-            'sisa_budget' => $this->sisa_budget,
         ]);
     }
 
     public function refreshSummary()
     {
-        $this->grand_total = Cart::instance($this->cart_instance)->subtotal(0, '', '');
+        // Hitung subtotal cart
+        $subtotal = Cart::instance($this->cart_instance)->subtotal(0, '', '');
+        $this->grand_total = (float) str_replace([',', 'Rp', ' '], '', $subtotal);
 
+        // Ambil budget dari DB
         if ($this->budget_id) {
             $masterBudget = MasterBudget::find($this->budget_id);
-            if ($masterBudget) {
-                $this->budget = $masterBudget->amount; // pastikan kolom sesuai
-            }
+            $this->budget = $masterBudget->amount ?? 0;
         }
 
+        // Hitung sisa budget
         $this->sisa_budget = $this->budget - $this->grand_total;
 
+        // Update sisa budget di database
         if ($this->budget_id) {
             MasterBudget::where('id', $this->budget_id)
                 ->update(['remaining_budget' => $this->sisa_budget]);
         }
+
+        // Kirim event ke frontend (Livewire v3)
+        $this->dispatch('update-budget-fields', [
+            'total_amount' => $this->grand_total,
+            'master_budget_value' => $this->budget,
+            'master_budget_remaining' => $this->sisa_budget,
+        ]);
     }
 
     public function productSelected($product)
     {
         $cart = Cart::instance($this->cart_instance);
 
-        $exists = $cart->search(function ($cartItem) use ($product) {
-            return $cartItem->id == $product['id'];
-        });
-
+        // Cegah duplikat produk
+        $exists = $cart->search(fn($cartItem) => $cartItem->id == $product['id']);
         if ($exists->isNotEmpty()) {
-            session()->flash('message', 'Product exists in the cart!');
+            session()->flash('message', 'Product already exists in the cart!');
             return;
         }
 
         $this->product = $product;
+        $calc = $this->calculate($product);
 
+        // Tambahkan ke cart
         $cart->add([
             'id'      => $product['id'],
             'name'    => $product['product_name'],
             'qty'     => 1,
-            'price'   => $this->calculate($product)['price'],
+            'price'   => $calc['price'],
             'weight'  => 1,
             'options' => [
                 'product_discount'      => 0,
                 'product_discount_type' => 'fixed',
-                'sub_total'             => $this->calculate($product)['sub_total'],
-                'code'                  => $product['product_code'],
-                'stock'                 => $product['product_quantity'],
-                'unit'                  => $product['product_unit'],
-                'product_tax'           => $this->calculate($product)['product_tax'],
-                'unit_price'            => $this->calculate($product)['unit_price'],
-                'date'                  => now()->format('Y-m-d')
+                'sub_total'             => $calc['sub_total'],
+                'code'                  => $product['product_code'] ?? '',
+                'stock'                 => $product['product_quantity'] ?? 0,
+                'unit'                  => $product['product_unit'] ?? '-', // ✅ UOM juga muncul di create
+                'unit_price'            => $calc['unit_price'],
+                'date'                  => now()->format('Y-m-d'),
             ]
         ]);
 
-        $this->check_quantity[$product['id']] = $product['product_quantity'];
+        $this->check_quantity[$product['id']] = $product['product_quantity'] ?? 0;
         $this->quantity[$product['id']] = 1;
         $this->discount_type[$product['id']] = 'fixed';
         $this->item_discount[$product['id']] = 0;
@@ -163,7 +200,7 @@ class ProductCart extends Component
     public function updateQuantity($row_id, $product_id)
     {
         if ($this->cart_instance == 'sale' || $this->cart_instance == 'purchase_return') {
-            if ($this->check_quantity[$product_id] < $this->quantity[$product_id]) {
+            if (($this->check_quantity[$product_id] ?? 0) < ($this->quantity[$product_id] ?? 0)) {
                 session()->flash('message', 'The requested quantity is not available in stock.');
                 return;
             }
@@ -179,7 +216,6 @@ class ProductCart extends Component
                 'code'                  => $cart_item->options->code,
                 'stock'                 => $cart_item->options->stock,
                 'unit'                  => $cart_item->options->unit,
-                'product_tax'           => $cart_item->options->product_tax,
                 'unit_price'            => $cart_item->options->unit_price,
                 'product_discount'      => $cart_item->options->product_discount,
                 'product_discount_type' => $cart_item->options->product_discount_type,
@@ -190,37 +226,23 @@ class ProductCart extends Component
         $this->refreshSummary();
     }
 
+    /**
+     * Hitung harga produk sederhana tanpa tax
+     */
     public function calculate($product, $new_price = null)
     {
-        $product_price = $new_price ?? $product['product_price'];
-
-        if ($this->cart_instance == 'purchase' || $this->cart_instance == 'purchase_return') {
-            $product_price = $product['product_cost'];
-        }
-
-        $price = $unit_price = $product_tax = $sub_total = 0;
-
-        if ($product['product_tax_type'] == 1) {
-            $price = $product_price + ($product_price * ($product['product_order_tax'] / 100));
-            $unit_price = $product_price;
-            $product_tax = $product_price * ($product['product_order_tax'] / 100);
-            $sub_total = $price;
-        } elseif ($product['product_tax_type'] == 2) {
-            $price = $product_price;
-            $unit_price = $product_price - ($product_price * ($product['product_order_tax'] / 100));
-            $product_tax = $product_price * ($product['product_order_tax'] / 100);
-            $sub_total = $product_price;
-        } else {
-            $price = $unit_price = $product_price;
-            $product_tax = 0;
-            $sub_total = $product_price;
-        }
+        $product_price = $new_price ?? ($product['product_price'] ?? 0);
+        $quantity = $product['quantity'] ?? 1;
+        $sub_total = $product_price * $quantity;
 
         return [
-            'price' => $price,
-            'unit_price' => $unit_price,
-            'product_tax' => $product_tax,
-            'sub_total' => $sub_total
+            'price' => $product_price,
+            'unit_price' => $product_price,
+            'product_tax' => 0,
+            'sub_total' => $sub_total,
         ];
     }
 }
+
+
+

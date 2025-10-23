@@ -15,6 +15,15 @@ class PurchaseDataTable extends DataTable
     public function dataTable($query) {
         return datatables()
             ->eloquent($query)
+            ->addColumn('users_id', function ($data) {
+                return $data->user ? $data->user->name : '';
+            })            
+            ->addColumn('department_id', function ($data) {
+                return $data->department ? $data->department->name : '';
+            })
+            ->addColumn('note', function ($data) {
+                    return $data->note ? $data->note : '-';
+            })
             ->addColumn('total_amount', function ($data) {
                 return format_currency($data->total_amount);
             })
@@ -69,10 +78,9 @@ class PurchaseDataTable extends DataTable
             Column::make('reference')
                 ->className('text-center align-middle'),
 
-            Column::make('user_id')
+            Column::make('users_id')
                 ->title('Requester By')
                 ->className('text-center align-middle'),
-
 
             Column::make('department_id')
                 ->title('Department')

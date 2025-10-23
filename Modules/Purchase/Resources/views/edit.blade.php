@@ -3,122 +3,200 @@
 @section('title', 'Edit Purchase')
 
 @section('breadcrumb')
-    <ol class="breadcrumb border-0 m-0">
-        <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
-        <li class="breadcrumb-item"><a href="{{ route('purchases.index') }}">Purchases</a></li>
-        <li class="breadcrumb-item active">Edit</li>
-    </ol>
+<ol class="breadcrumb border-0 m-0">
+    <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('purchases.index') }}">Purchases</a></li>
+    <li class="breadcrumb-item active">Edit</li>
+</ol>
 @endsection
 
 @section('content')
-    <div class="container-fluid mb-4">
-        <div class="row">
-            <div class="col-12">
-                <livewire:search-product/>
-            </div>
+<div class="container-fluid mb-4">
+    {{-- Search Product --}}
+    <div class="row">
+        <div class="col-12">
+            <livewire:search-product/>
         </div>
+    </div>
 
-        <div class="row mt-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-body">
-                        @include('utils.alerts')
-                        <form id="purchase-form" action="{{ route('purchases.update', $purchase) }}" method="POST">
-                            @csrf
-                            @method('patch')
-                            <div class="form-row">
-                                <div class="col-lg-4">
-                                    <div class="form-group">
-                                        <label for="reference">Reference <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control" name="reference" required value="{{ $purchase->reference }}" readonly>
-                                    </div>
-                                </div>
-                                <div class="col-lg-4">
-                                    <div class="from-group">
-                                        <div class="form-group">
-                                            <label for="supplier_id">Supplier <span class="text-danger">*</span></label>
-                                            <select class="form-control" name="supplier_id" id="supplier_id" required>
-                                                @foreach(\Modules\People\Entities\Supplier::all() as $supplier)
-                                                    <option {{ $purchase->supplier_id == $supplier->id ? 'selected' : '' }} value="{{ $supplier->id }}">{{ $supplier->supplier_name }}</option>
-                                                @endforeach
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-lg-4">
-                                    <div class="from-group">
-                                        <div class="form-group">
-                                            <label for="date">Date <span class="text-danger">*</span></label>
-                                            <input type="date" class="form-control" name="date" required value="{{ $purchase->date }}">
-                                        </div>
-                                    </div>
+    {{-- Purchase Form --}}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    @include('utils.alerts')
+
+                    {{-- === FORM YANG BENAR === --}}
+                    <form id="purchase-form" action="{{ route('purchases.update', $purchase->id) }}" method="POST">
+                        @csrf
+                        @method('PATCH')
+
+                        <div class="form-row">
+                            {{-- No. Permintaan --}}
+                            <div class="col-lg-4">
+                                <div class="form-group">
+                                    <label for="reference">No. Permintaan <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" name="reference" readonly value="{{ $purchase->reference }}">
                                 </div>
                             </div>
 
-                            <livewire:product-cart :cartInstance="'purchase'" :data="$purchase"/>
-
-                            <div class="form-row">
-                                <div class="col-lg-4">
-                                    <div class="form-group">
-                                        <label for="status">Status <span class="text-danger">*</span></label>
-                                        <select class="form-control" name="status" id="status" required>
-                                            <option {{ $purchase->status == 'Pending' ? 'selected' : '' }} value="Pending">Pending</option>
-                                            <option {{ $purchase->status == 'Ordered' ? 'selected' : '' }} value="Ordered">Ordered</option>
-                                            <option {{ $purchase->status == 'Completed' ? 'selected' : '' }} value="Completed">Completed</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="col-lg-4">
-                                    <div class="from-group">
-                                        <div class="form-group">
-                                            <label for="payment_method">Payment Method <span class="text-danger">*</span></label>
-                                            <input type="text" class="form-control" name="payment_method" required value="{{ $purchase->payment_method }}" readonly>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="col-lg-4">
-                                    <div class="form-group">
-                                        <label for="paid_amount">Amount Received <span class="text-danger">*</span></label>
-                                        <input id="paid_amount" type="text" class="form-control" name="paid_amount" required value="{{ $purchase->paid_amount }}" readonly>
-                                    </div>
+                            {{-- Department --}}
+                            <div class="col-lg-4">
+                                <div class="form-group">
+                                    <label for="department_id">Department <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" 
+                                        value="{{ optional(auth()->user()->department)->department_name ?? '-' }}" readonly>
+                                    <input type="hidden" name="department_id" 
+                                        value="{{ optional(auth()->user()->department)->id ?? '' }}">
                                 </div>
                             </div>
 
-                            <div class="form-group">
-                                <label for="note">Note (If Needed)</label>
-                                <textarea name="note" id="note" rows="5" class="form-control">{{ $purchase->note }}</textarea>
+                            {{-- Requester --}}
+                            <div class="col-lg-4">
+                                <div class="form-group">
+                                    <label for="users_id">Requester <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control" value="{{ auth()->user()->name }}" readonly>
+                                    <input type="hidden" name="users_id" value="{{ auth()->id() }}">
+                                </div>
                             </div>
 
-                            <div class="mt-3">
-                                <button type="submit" class="btn btn-primary">
-                                    Update Purchase <i class="bi bi-check"></i>
-                                </button>
+                            {{-- Date --}}
+                            <div class="col-lg-4 mt-3">
+                                <div class="form-group">
+                                    <label for="date">Date <span class="text-danger">*</span></label>
+                                    <input type="date" class="form-control" name="date" required value="{{ $purchase->date }}">
+                                </div>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+
+                        {{-- Note --}}
+                        <div class="form-group mt-3">
+                            <label for="note">Note (If Needed)</label>
+                            <textarea name="note" id="note" rows="5" class="form-control">{{ $purchase->note }}</textarea>
+                        </div>
+
+                        {{-- Product Cart --}}
+                        <livewire:product-cart :cartInstance="'purchase'" :data="$purchase" />
+
+                        {{-- ====== Ringkasan Budget ====== --}}
+                        <div class="card border-0 shadow-sm mt-4">
+                            <div class="card-body">
+                                <h5 class="fw-bold mb-3 text-secondary">Budget Summary</h5>
+
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <th class="text-start text-muted">Grand Total</th>
+                                        <td class="text-end fw-bold" id="grand_total_display">
+                                            Rp{{ number_format($purchase->total_amount ?? 0, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-start text-muted">Budget</th>
+                                        <td class="text-end fw-bold" id="budget_display">
+                                            Rp{{ number_format($purchase->master_budget_value ?? 0, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th class="text-start text-muted">Sisa Budget</th>
+                                        <td class="text-end fw-bold {{ ($purchase->master_budget_remaining ?? 0) < 0 ? 'text-danger' : 'text-success' }}" id="sisa_budget_display">
+                                            Rp{{ number_format($purchase->master_budget_remaining ?? 0, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                </table>
+
+                                {{-- Hidden input untuk Controller --}}
+                                <input type="hidden" name="total_amount" id="total_amount" value="{{ $purchase->total_amount ?? 0 }}">
+                                <input type="hidden" name="master_budget_value" id="master_budget_value" value="{{ $purchase->master_budget_value ?? 0 }}">
+                                <input type="hidden" name="master_budget_remaining" id="master_budget_remaining" value="{{ $purchase->master_budget_remaining ?? 0 }}">
+                            </div>
+                        </div>
+
+                        {{-- Tombol Submit --}}
+                        <div class="mt-4 text-end">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="bi bi-save"></i> Update Purchase
+                            </button>
+                        </div>
+                    </form> {{-- Tutup form dengan benar --}}
                 </div>
             </div>
         </div>
     </div>
+</div>
 @endsection
 
+
 @push('page_scripts')
-    <script src="{{ asset('js/jquery-mask-money.js') }}"></script>
-    <script>
-        $(document).ready(function () {
-            $('#paid_amount').maskMoney({
-                prefix:'{{ settings()->currency->symbol }}',
-                thousands:'{{ settings()->currency->thousand_separator }}',
-                decimal:'{{ settings()->currency->decimal_separator }}',
-                allowZero: true,
-            });
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-            $('#paid_amount').maskMoney('mask');
+<script>
+document.addEventListener('livewire:init', () => {
+    Livewire.on('update-budget-fields', (data) => {
+        const payload = Array.isArray(data) ? data[0] : data;
+        console.log('Data diterima dari Livewire (edit):', payload);
 
-            $('#purchase-form').submit(function () {
-                var paid_amount = $('#paid_amount').maskMoney('unmasked')[0];
-                $('#paid_amount').val(paid_amount);
-            });
+        const formatRupiah = (angka) => {
+            const num = Number(angka) || 0;
+            return 'Rp' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        };
+
+        // Update tampilan
+        document.getElementById('grand_total_display').innerText = formatRupiah(payload.total_amount);
+        document.getElementById('budget_display').innerText = formatRupiah(payload.master_budget_value);
+        const sisa = document.getElementById('sisa_budget_display');
+        sisa.innerText = formatRupiah(payload.master_budget_remaining);
+
+        // Warna merah jika minus
+        if (payload.master_budget_remaining < 0) {
+            sisa.classList.add('text-danger', 'fw-bold');
+            sisa.classList.remove('text-success');
+        } else {
+            sisa.classList.remove('text-danger', 'fw-bold');
+            sisa.classList.add('text-success');
+        }
+
+        // Hidden input update
+        document.getElementById('total_amount').value = payload.total_amount;
+        document.getElementById('master_budget_value').value = payload.master_budget_value;
+        document.getElementById('master_budget_remaining').value = payload.master_budget_remaining;
+    });
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('purchase-form');
+    const status = '{{ $purchase->status }}'; // Ambil status dari server
+
+    // === 🔔 Munculkan notifikasi otomatis jika status pending ===
+    if (status === 'pending') {
+        Swal.fire({
+            title: 'Menunggu Approval',
+            text: 'Purchase Request ini masih menunggu persetujuan. Anda masih bisa mengedit sebelum disetujui.',
+            icon: 'info',
+            confirmButtonText: 'Mengerti',
+            confirmButtonColor: '#3085d6'
         });
-    </script>
+    }
+
+    // === Konfirmasi sebelum submit ===
+    form.addEventListener('submit', function (e) {
+        e.preventDefault(); // cegah submit langsung
+
+        Swal.fire({
+            title: 'PR sedang menunggu approval',
+            text: 'Apakah kamu yakin mau mengedit data ini?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Ya, lanjut edit',
+            cancelButtonText: 'Tidak',
+            reverseButtons: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit(); // lanjutkan submit jika user klik Yes
+            }
+        });
+    });
+});
+</script>
 @endpush

@@ -1,5 +1,7 @@
 <?php
 
+use Illuminate\Support\Facades\Route;
+use Modules\Purchase\Http\Controllers\PurchaseController;
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -36,5 +38,10 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('/purchase-payments/{purchase_id}/edit/{purchasePayment}', 'PurchasePaymentsController@edit')->name('purchase-payments.edit');
     Route::patch('/purchase-payments/update/{purchasePayment}', 'PurchasePaymentsController@update')->name('purchase-payments.update');
     Route::delete('/purchase-payments/destroy/{purchasePayment}', 'PurchasePaymentsController@destroy')->name('purchase-payments.destroy');
+    
+Route::post('/purchases/{id}/update-status', [PurchaseController::class, 'updateStatus'])
+    ->name('purchases.updateStatus');
 
+    Route::get('/purchases/{id}/print', [PurchaseController::class, 'print'])
+    ->name('purchases.print');
 });

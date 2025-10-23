@@ -118,23 +118,7 @@
             @endif
         </a>
 
-        <div class="dropdown-menu dropdown-menu-right dropdown-menu-lg pt-0">
-            <div class="dropdown-header bg-light">
-                <strong>Purchase Request Pending ({{ $pending_purchase_requests->count() }})</strong>
-            </div>
 
-            @forelse($pending_purchase_requests as $pr)
-                <a class="dropdown-item" href="{{ route('purchase_request.show', $pr->id) }}">
-                    <i class="bi bi-hourglass-split text-warning mr-1"></i>
-                    Purchase Request <strong>{{ $pr->reference }}</strong> pending approval.
-                </a>
-            @empty
-                <a class="dropdown-item text-muted" href="#">
-                    <i class="bi bi-check2-circle text-success mr-2"></i>
-                    No pending Purchase Request.
-                </a>
-            @endforelse
-        </div>
     </li>
     @endcan
 

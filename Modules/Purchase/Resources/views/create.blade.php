@@ -3,11 +3,11 @@
 @section('title', 'Create Purchase')
 
 @section('breadcrumb')
-    <ol class="breadcrumb border-0 m-0">
-        <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
-        <li class="breadcrumb-item"><a href="{{ route('purchases.index') }}">Purchases</a></li>
-        <li class="breadcrumb-item active">Add</li>
-    </ol>
+<ol class="breadcrumb border-0 m-0">
+    <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('purchases.index') }}">Purchases</a></li>
+    <li class="breadcrumb-item active">Create</li>
+</ol>
 @endsection
 
 @section('content')
@@ -76,46 +76,134 @@
                         {{-- Product Cart --}}
                         <livewire:product-cart :cartInstance="'purchase'" />
 
-                        {{-- Submit Button --}}
-                        <div class="mt-3">
-                            <button type="submit" class="btn btn-primary">
-                                Create Purchase <i class="bi bi-check"></i>
-                            </button>
+                            {{-- ====== Ringkasan Budget ====== --}}
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="fw-bold mb-3 text-secondary">Budget Summary</h5>
+
+                                        <table class="table table-borderless">
+                                            <tr>
+                                                <th class="text-start text-muted">Grand Total</th>
+                                                <td class="text-end fw-bold" id="grand_total_display">Rp0</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-start text-muted">Budget</th>
+                                                <td class="text-end fw-bold" id="budget_display">Rp0</td>
+                                            </tr>
+                                            <tr>
+                                                <th class="text-start text-muted">Sisa Budget</th>
+                                                <td class="text-end fw-bold text-success" id="sisa_budget_display">Rp0</td>
+                                            </tr>
+                                        </table>
+
+                                        {{-- Hidden input untuk dikirim ke Controller --}}
+                                        <input type="hidden" name="total_amount" id="total_amount" value="0">
+                                        <input type="hidden" name="master_budget_value" id="master_budget_value" value="0">
+                                        <input type="hidden" name="master_budget_remaining" id="master_budget_remaining" value="0">
+                                    </div>
+                                </div>
+
+                                {{-- ====== Tombol Submit ====== --}}
+                                <div class="mt-4 text-end">
+                                    <button type="submit" class="btn btn-primary px-4">
+                                        <i class="bi bi-save"></i> Submit Purchase
+                                    </button>
+                                </div>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
-</div>
 @endsection
 
-@push('page_scripts')
-<script src="{{ asset('js/jquery-mask-money.js') }}"></script>
+
+@push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
 <script>
-$(document).ready(function () {
-    // MaskMoney untuk paid_amount (jika ada)
-    $('#paid_amount').maskMoney({
-        prefix: '{{ settings()->currency->symbol }} ',
-        thousands: '{{ settings()->currency->thousand_separator }}',
-        decimal: '{{ settings()->currency->decimal_separator }}',
-        precision: 0,
-        allowZero: true,
-    });
+document.addEventListener('livewire:init', () => {
+    Livewire.on('update-budget-fields', (data) => {
+        const payload = Array.isArray(data) ? data[0] : data;
+        console.log('Data diterima dari Livewire:', payload);
 
-    // Ambil total tombol
-    $('#getTotalAmount').click(function () {
-        let cartTotal = {{ Cart::instance('purchase')->total(0, '', '') }};
-        $('#paid_amount').val(cartTotal);
-        $('#paid_amount').maskMoney('mask');
-    });
+        const formatRupiah = (angka) => {
+            let num = Number(angka);
+            if (isNaN(num)) num = 0;
+            return num.toLocaleString('id-ID', { 
+                style: 'currency', 
+                currency: 'IDR', 
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            });
+        };
 
-    // Submit form
-    $('#purchase-form').submit(function () {
-        var rawValue = $('#paid_amount').maskMoney('unmasked')[0];
-        if (isNaN(rawValue)) rawValue = 0;
-        $('#paid_amount').val(rawValue); 
-        return true;
+        const grandTotalEl = document.getElementById('grand_total_display');
+        const budgetEl = document.getElementById('budget_display');
+        const sisaEl = document.getElementById('sisa_budget_display');
+
+        const total = Number(payload.total_amount);
+        const budget = Number(payload.master_budget_value);
+        const remaining = Number(payload.master_budget_remaining);
+
+        grandTotalEl.innerText = formatRupiah(total);
+        budgetEl.innerText = formatRupiah(budget);
+        sisaEl.innerText = formatRupiah(remaining);
+
+        // Warna merah jika negatif
+        sisaEl.style.setProperty('color', remaining < 0 ? 'red' : 'black', 'important');
+
+        document.getElementById('total_amount').value = total;
+        document.getElementById('master_budget_value').value = budget;
+        document.getElementById('master_budget_remaining').value = remaining;
+    });
+});
+
+// === Konfirmasi sebelum submit dengan pengecekan budget ===
+document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('purchase-form');
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault(); // cegah submit langsung
+
+        const remaining = Number(document.getElementById('master_budget_remaining').value);
+
+        // Jika melebihi budget
+        if (remaining < 0) {
+            Swal.fire({
+                title: 'Budget Melebihi Batas!',
+                text: 'Total permintaan melebihi budget yang tersedia. Apakah kamu yakin ingin tetap membuat PR ini?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, tetap buat PR',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                confirmButtonColor: '#e74c3c',
+                cancelButtonColor: '#6c757d',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        } 
+        // Jika masih dalam budget
+        else {
+            Swal.fire({
+                title: 'Buat Purchase Request?',
+                text: 'Apakah kamu yakin ingin mengirim PR ini?',
+                icon: 'question',
+                showCancelButton: true,7
+                confirmButtonText: 'Ya',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        }
     });
 });
 </script>

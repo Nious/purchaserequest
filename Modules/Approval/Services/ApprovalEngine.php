@@ -13,11 +13,11 @@ class ApprovalEngine
     /**
      * Membuat Approval Request baru berdasarkan ApprovalType dan Rule yang berlaku.
      */
-    public function createRequest($modelClass, $modelId, $approvalTypeId, $amount, $requestedBy)
+    public function createRequest($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy)
     {
-        return DB::transaction(function () use ($modelClass, $modelId, $approvalTypeId, $amount, $requestedBy) {
+        return DB::transaction(function () use ($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy) {
             // cari rule yang cocok
-            $rule = ApprovalRule::where('approval_type_id', $approvalTypeId)
+            $rule = ApprovalRule::where('approval_types_id', $approvalTypesId)
                 ->where('amount_limit', '>=', $amount)
                 ->where('is_active', true)
                 ->first();
@@ -28,7 +28,7 @@ class ApprovalEngine
 
             // buat request
             $approvalRequest = ApprovalRequest::create([
-                'approval_type_id' => $approvalTypeId,
+                'approval_types_id' => $approvalTypesId,
                 'requestable_type' => $modelClass,
                 'requestable_id' => $modelId,
                 'requested_by' => $requestedBy,
@@ -37,12 +37,12 @@ class ApprovalEngine
             ]);
 
             // buat log untuk level pertama
-            $level = ApprovalRuleLevel::where('approval_rule_id', $rule->id)
+            $level = ApprovalRuleLevel::where('approval_rules_id', $rule->id)
                 ->orderBy('level')
                 ->first();
 
             if ($level) {
-                $approvers = ApprovalRuleUser::where('approval_rule_level_id', $level->id)->get();
+                $approvers = ApprovalRuleUser::where('approval_rule_levels_id', $level->id)->get();
 
                 foreach ($approvers as $approver) {
                     $approvalRequest->logs()->create([
@@ -94,7 +94,7 @@ class ApprovalEngine
             if ($pending == 0) {
                 $nextLevel = $approvalRequest->current_level + 1;
 
-                $nextLevelData = \Modules\Approval\Entities\ApprovalRuleLevel::where('approval_rule_id', $approvalRequest->type->rules->id)
+                $nextLevelData = \Modules\Approval\Entities\ApprovalRuleLevel::where('approval_rules_id', $approvalRequest->type->rules->id)
                     ->where('level', $nextLevel)
                     ->first();
 
@@ -127,10 +127,21 @@ class ApprovalEngine
         $model = $approvalRequest->requestable;
         if (!$model) return;
 
-        if ($approvalRequest->status === 'approved') {
-            $model->update(['approval_status' => 'Approved']);
-        } elseif ($approvalRequest->status === 'rejected') {
-            $model->update(['approval_status' => 'Rejected']);
-        }
+        $status = match ($approvalRequest->status) {
+            'approved' => 'Approved',
+            'rejected' => 'Rejected',
+            default    => 'Pending',
+        };
+
+        $model->update(['status' => $status]);
     }
+
+    public function approve(ApprovalRequest $request, $user)
+    {
+        $request->update(['status' => 'approved']);
+        $this->syncStatusToSource($request);
+    }
+
+
+
 }

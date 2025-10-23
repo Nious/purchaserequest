@@ -38,4 +38,10 @@ class Kernel extends ConsoleKernel
 
         require base_path('routes/console.php');
     }
+
+    protected $routeMiddleware = [
+    // middleware lain...
+        'check.approval.access' => \Modules\Approval\Http\Middleware\CheckApprovalAccess::class,
+    ];
+
 }

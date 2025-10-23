@@ -4,6 +4,7 @@ namespace Modules\Purchase\Entities;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Modules\Product\Entities\Product;
 
 class Purchase extends Model
 {
@@ -11,8 +12,14 @@ class Purchase extends Model
 
     protected $guarded = [];
 
-    public function purchaseDetails() {
-        return $this->hasMany(PurchaseDetail::class, 'purchase_id', 'id');
+    public function purchaseDetails()
+    {
+        return $this->hasMany(\Modules\Purchase\Entities\PurchaseDetail::class, 'purchase_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
     }
 
     public function purchasePayments() {
@@ -28,9 +35,6 @@ class Purchase extends Model
     }
 
     public static function boot() {
-
-
-
 
 
         parent::boot();

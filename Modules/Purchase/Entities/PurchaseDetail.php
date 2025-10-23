@@ -11,7 +11,19 @@ class PurchaseDetail extends Model
     use HasFactory;
 
     protected $guarded = [];
-
+     protected $fillable = [
+        'purchase_id',
+        'product_id',
+        'product_name',
+        'product_code',
+        'quantity',
+        'price',
+        'unit_price',
+        'sub_total',
+        'product_discount_amount',
+        'product_discount_type',
+        'product_tax_amount',
+    ];
     protected $with = ['product'];
 
     public function product() {

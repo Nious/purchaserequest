@@ -79,30 +79,4 @@
             </table>
         </div>
     </div>
-    {{-- Summary --}}
-    <div class="row justify-content-md-end">
-        <div class="col-md-4">
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <tr>
-                        <th>Grand Total</th>
-                        <th>= {{ format_currency($grand_total) }}</th>
-                    </tr>
-                    <tr>
-                        <th>Budget</th>
-                        <td>- {{ format_currency($budget) }}</td>
-                    </tr>
-                    <tr>
-                        <th>Sisa Budget</th>
-                        <td>
-                            = <span class="{{ $sisa_budget < 0 ? 'text-danger fw-bold' : 'text-success' }}">
-                                {{ format_currency($sisa_budget) }}
-                            </span>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-    </div>
-
 </div>

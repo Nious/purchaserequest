@@ -4,7 +4,7 @@
 namespace Modules\Budget\Entities;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
+use Modules\Approval\Entities\ApprovalRequest;
 class MasterBudget extends Model
 {
     use HasFactory;
@@ -19,17 +19,19 @@ class MasterBudget extends Model
         'department_id',
         'description',
         'grandtotal',
-        'approval_status',
+        'status',
+        'used_amount',
+        'reserved_amount',
     ];
 
         public function scopeApproved($query)
     {
-        return $query->where('approval_status', 'Approved');
+        return $query->where('status', 'Approved');
     }
 
     public function scopePending($query)
     {
-        return $query->where('approval_status', 'Pending');
+        return $query->where('status', 'Pending');
     }
 
     public function details()
@@ -40,6 +42,16 @@ class MasterBudget extends Model
     public function getGrandtotalFormattedAttribute()
     {
         return 'Rp ' . number_format($this->grandtotal, 0, ',', '.');
+    }
+
+    public function getUsedAmountFormattedAttribute()
+    {
+        return 'Rp ' . number_format($this->used_amount ?? 0, 0, ',', '.');
+    }
+
+    public function getRemainingFormattedAttribute()
+    {
+        return 'Rp ' . number_format($this->remaining ?? 0, 0, ',', '.');
     }
     public function getBulanTextAttribute()
     {
@@ -66,5 +78,18 @@ class MasterBudget extends Model
     {
         return $this->status === 'approved';
     }
+
+    public function getRemainingAttribute()
+    {
+        return (float) $this->grandtotal - (float) $this->reserved_amount - (float) $this->used_amount;
+    }
+
+    public function process(ApprovalRequest $request, $action, $user)
+    {
+        // proses approval...
+        $request->update(['status' => $action]);
+        $this->syncStatusToSource($request);
+    }
+
     
 }

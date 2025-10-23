@@ -11,11 +11,12 @@ class ApprovalRuleUser extends Model
         'approval_rule_levels_id',
         'user_id',
         'role',
+        'sequence',
     ];
 
     public function level()
     {
-        return $this->belongsTo(ApprovalRuleLevel::class, 'approval_rule_level_id');
+        return $this->belongsTo(ApprovalRuleLevel::class, 'approval_rule_levels_id');
     }
 
     public function user()

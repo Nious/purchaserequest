@@ -16,7 +16,7 @@ class MasterBudgetsDataTable extends DataTable
             ->eloquent($query)
             ->addIndexColumn()
             ->editColumn('grandtotal', function ($data) {
-                return 'Rp ' . number_format($data->grandtotal, 0, ',', '.');
+                return $data->grandtotal_formatted;
             })
             ->addColumn('bulan_text', function ($data) {
                 return $data->bulan_text; // pakai accessor
@@ -24,16 +24,37 @@ class MasterBudgetsDataTable extends DataTable
             ->addColumn('department_name', function ($data) {
                 return $data->department ? $data->department->department_name : '-';
             })
-            ->addColumn('approval', function ($data) {
-                if ($data->approval_status == 'Approved') {
-                    return '<span class="badge bg-success">Approved</span>';
-                } elseif ($data->approval_status == 'Pending') {
-                    return '<span class="badge bg-danger">Pending</span>';
-                } else {
-                    return '<span class="badge bg-secondary">Draft</span>';
-                }
+            ->addColumn('used_budget', function ($data) {
+                return $data->used_amount_formatted;
             })
-            
+            ->addColumn('remaining_budget', function ($data) {
+                return $data->remaining_formatted;
+            })
+            ->addColumn('approval', function ($data) {
+                $status = $data->status ?? 'Pending';
+
+                if ($status === 'Pending') {
+                    return '
+                        <div class="dropdown">
+                            <button class="btn btn-warning btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                Pending
+                            </button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item approve-btn" href="#" data-id="'.$data->id.'">Approve</a></li>
+                                <li><a class="dropdown-item reject-btn" href="#" data-id="'.$data->id.'">Reject</a></li>
+                            </ul>
+                        </div>
+                    ';
+                }
+
+                return match ($status) {
+                    'Approved' => '<span class="badge bg-success">Approved</span>',
+                    'Rejected' => '<span class="badge bg-danger">Rejected</span>',
+                    default    => '<span class="badge bg-warning text-dark">Pending</span>',
+                };
+            })
+
+
             ->addColumn('action', function ($data) {
                 return view('budget::master_budget.partials.actions', compact('data'));
             })
@@ -43,7 +64,10 @@ class MasterBudgetsDataTable extends DataTable
 
     public function query(MasterBudget $model)
     {
-        return $model->newQuery()->with('department');
+        
+        return $model->newQuery()
+        ->select('master_budget.*') // pastikan sesuai dengan nama tabel di database
+        ->with('department');
     }
 
 
@@ -78,6 +102,8 @@ class MasterBudgetsDataTable extends DataTable
             Column::computed('bulan_text')->title('Bulan')->addClass('text-center'),
             Column::computed('department_name')->title('Departemen')->addClass('text-center'),
             Column::make('grandtotal')->title('Total Budget')->addClass('text-end'),
+            Column::computed('used_budget')->title('Used Budget')->addClass('text-end'),
+            Column::computed('remaining_budget')->title('Remaining Budget')->addClass('text-end'),
             Column::computed('approval')->title('Approval')->addClass('text-center'),
             Column::computed('action')->title('Ubah / Hapus')->exportable(false)->printable(false)->addClass('text-center'),
         ];
@@ -92,5 +118,6 @@ class MasterBudgetsDataTable extends DataTable
     {
         return $this->periode_awal . ' - ' . $this->periode_akhir;
     }
+
 
 }
