@@ -133,16 +133,18 @@ class ProductCart extends Component
         if ($this->department_id) {
             $currentMonth = now()->month;
             $currentYear = now()->year;
-
-            $masterBudget = MasterBudget::where('department_id', $this->department_id)
-                                        ->where('bulan', $currentMonth)
-                                        ->whereYear('periode_awal', $currentYear) // Pastikan untuk tahun yang benar
-                                        ->first(); // Ambil budget pertama yang cocok
+        
+            // Langsung jumlahkan kolom 'grandtotal' dari semua budget yang cocok
+            $totalBudget = MasterBudget::where('department_id', $this->department_id)
+                                       ->where('bulan', $currentMonth)
+                                       ->whereYear('periode_awal', $currentYear)
+                                       ->where('status', 'approved')
+                                       ->sum('grandtotal'); // <-- Menjumlahkan semua data ➕
             
-            if ($masterBudget) {
-                $this->budget_id = $masterBudget->id; // Simpan ID budget yang ditemukan
-                $this->budget = $masterBudget->grandtotal ?? 0;
-            }
+            // Set properti budget dengan total yang didapat
+            $this->budget = $totalBudget;
+        
+            // Catatan: $this->budget_id tidak di-set karena kita mengambil total dari banyak budget, bukan satu.
         }
 
         $this->sisa_budget = $this->budget - $this->grand_total;
