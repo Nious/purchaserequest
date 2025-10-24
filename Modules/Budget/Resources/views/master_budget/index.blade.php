@@ -24,7 +24,7 @@
                     </a>
                     <hr>
                     <div class="card">
-                        <div class="card-body">
+                        <div class="card-body table-responsive">
                             {!! $dataTable->table(['class' => 'table table-bordered table-striped']) !!}
                         </div>
                     </div>
