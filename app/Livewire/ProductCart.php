@@ -29,11 +29,13 @@ class ProductCart extends Component
     public $sisa_budget = 0;
 
     private $product;
+    public $department_id;
 
-    public function mount($cartInstance = 'purchase', $budgetId = null, $data = null)
+    public function mount($cartInstance = 'purchase', $budgetId = null, $departmentId = null, $data = null)
     {
         $this->cart_instance = $cartInstance;
         $this->budget_id = $budgetId;
+        $this->department_id = $departmentId;
 
         // Bersihkan cart lama
         Cart::instance($this->cart_instance)->destroy();
@@ -127,19 +129,31 @@ class ProductCart extends Component
         // Tambahkan shipping
         $this->grand_total = $total_after_discount + ($this->shipping ?? 0);
 
-        // Ambil budget
-        if ($this->budget_id) {
-            $masterBudget = MasterBudget::find($this->budget_id);
-            $this->budget = $masterBudget->amount ?? 0;
+        // Ambil budget berdasarkan department dan bulan saat ini
+        if ($this->department_id) {
+            $currentMonth = now()->month;
+            $currentYear = now()->year;
+        
+            // Langsung jumlahkan kolom 'grandtotal' dari semua budget yang cocok
+            $totalBudget = MasterBudget::where('department_id', $this->department_id)
+                                       ->where('bulan', $currentMonth)
+                                       ->whereYear('periode_awal', $currentYear)
+                                       ->where('status', 'approved')
+                                       ->sum('grandtotal'); // <-- Menjumlahkan semua data ➕
+            
+            // Set properti budget dengan total yang didapat
+            $this->budget = $totalBudget;
+        
+            // Catatan: $this->budget_id tidak di-set karena kita mengambil total dari banyak budget, bukan satu.
         }
 
         $this->sisa_budget = $this->budget - $this->grand_total;
 
         // Update budget di database jika ada
-        if ($this->budget_id) {
-            MasterBudget::where('id', $this->budget_id)
-                ->update(['remaining_budget' => $this->sisa_budget]);
-        }
+        // if ($this->budget_id) {
+        //     MasterBudget::where('id', $this->budget_id)
+        //         ->update(['remaining_budget' => $this->sisa_budget]);
+        // }
 
         
         // Dispatch ke JS

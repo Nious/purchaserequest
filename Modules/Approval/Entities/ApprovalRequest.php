@@ -17,6 +17,7 @@ class ApprovalRequest extends Model
         'requestable_type',
         'requestable_id',
         'requested_by',
+        'amount',
         'status',
         'current_level',
         'note',

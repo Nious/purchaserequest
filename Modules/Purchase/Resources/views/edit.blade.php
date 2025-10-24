@@ -10,6 +10,11 @@
 </ol>
 @endsection
 
+@php
+    // Definisikan departmentId di satu tempat agar bersih
+    $departmentId = auth()->user()->department_id;
+@endphp
+
 @section('content')
 <div class="container-fluid mb-4">
     {{-- Search Product --}}
@@ -76,7 +81,7 @@
                         </div>
 
                         {{-- Product Cart --}}
-                        <livewire:product-cart :cartInstance="'purchase'" :data="$purchase" />
+                        <livewire:product-cart :cartInstance="'purchase'" :data="$purchase" :departmentId="$departmentId" />
 
                         {{-- ====== Ringkasan Budget ====== --}}
                         <div class="card border-0 shadow-sm mt-4">

@@ -87,18 +87,18 @@ class MasterBudgetsController extends Controller
             }
         }
         
-        // // 🔗 Integrasi Approval
-        // $approvalTypesId = config('approval.types.master_budget'); // bisa hardcode dulu misal 1
-        // $approval = app(\Modules\Approval\Services\ApprovalEngine::class)
-        //     ->createRequest(
-        //         MasterBudget::class,
-        //         $master->id,
-        //         $approvalTypesId,
-        //         $master->grandtotal,
-        //         auth()->id()
-        //     );
+        // 🔗 Integrasi Approval
+        $approvalTypesId = 19; // bisa hardcode dulu misal 1
+        $approval = app(\Modules\Approval\Services\ApprovalEngine::class)
+            ->createRequest(
+                MasterBudget::class,
+                $master->id,
+                $approvalTypesId,
+                $master->grandtotal,
+                auth()->id()
+            );
 
-        // $master->update(['approval_request_id' => $approval->id]);
+        $master->update(['approval_request_id' => $approval->id]);
     });
 
     
