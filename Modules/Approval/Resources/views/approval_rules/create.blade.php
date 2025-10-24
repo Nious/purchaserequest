@@ -1,16 +1,17 @@
 @extends('layouts.app')
 @section('title','Create Approval Rule')
 @section('third_party_stylesheets')
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.25/css/dataTables.bootstrap4.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.25/css/dataTables.bootstrap4.min.css">
 @endsection
 
 @section('breadcrumb')
-    <ol class="breadcrumb border-0 m-0">
-        <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
-        <li class="breadcrumb-item"><a href="{{ route('approval_rules.index') }}">Approval Rules</a></li>
-        <li class="breadcrumb-item active">Create</li>
-    </ol>
+<ol class="breadcrumb border-0 m-0">
+    <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('approval_rules.index') }}">Approval Rules</a></li>
+    <li class="breadcrumb-item active">Create</li>
+</ol>
 @endsection
+
 @section('content')
 <div class="container-fluid">
     @include('utils.alerts')
@@ -30,7 +31,7 @@
                     </div>
                     <div class="col-md-4">
                         <label>Rule Name</label>
-                        <input name="rule_name" class="form-control" />
+                        <input name="rule_name" class="form-control" required />
                     </div>
                     <div class="col-md-2">
                         <label>&nbsp;</label><br>
@@ -60,9 +61,51 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 
-
 <script>
 let levelIndex = 0;
+
+/* -------------------- FORMAT RUPIAH -------------------- */
+function formatRupiah(angka, prefix = 'Rp. ') {
+    if (!angka) return prefix + '0';
+    let number_string = angka.replace(/[^,\d]/g, '').toString(),
+        split = number_string.split(','),
+        sisa = split[0].length % 3,
+        rupiah = split[0].substr(0, sisa),
+        ribuan = split[0].substr(sisa).match(/\d{3}/gi);
+    if (ribuan) {
+        let separator = sisa ? '.' : '';
+        rupiah += separator + ribuan.join('.');
+    }
+    rupiah = split[1] !== undefined ? rupiah + ',' + split[1] : rupiah;
+    return prefix + rupiah;
+}
+
+// Fokus input → kosongkan jika 0
+$(document).on('focus', '.amount-limit', function () {
+    let val = $(this).val().replace(/[^0-9]/g, '');
+    if (val === '' || val === '0') $(this).val('');
+});
+
+// Saat mengetik → ubah ke format rupiah
+$(document).on('input', '.amount-limit', function () {
+    let digits = $(this).val().replace(/[^0-9]/g, '').replace(/^0+/, '');
+    $(this).val(digits === '' ? 'Rp. 0' : formatRupiah(digits));
+});
+
+// Blur → jika kosong, tampilkan Rp. 0
+$(document).on('blur', '.amount-limit', function () {
+    let digits = $(this).val().replace(/[^0-9]/g, '');
+    $(this).val(digits === '' ? 'Rp. 0' : formatRupiah(digits));
+});
+
+// Submit → ubah ke angka murni
+$('#rule-form').on('submit', function () {
+    $('.amount-limit').each(function () {
+        let numeric = $(this).val().replace(/[^0-9]/g, '');
+        $(this).val(numeric === '' ? '0' : numeric);
+    });
+});
+/* ------------------------------------------------------ */
 
 function userPairRowHtml(levelIdx, pairIdx) {
     return `
@@ -103,7 +146,7 @@ function levelHtml(idx) {
             </div>
             <div class="col-md-3">
                 <label>Amount Limit</label>
-                <input type="number" step="0.01" name="levels[${idx}][amount_limit]" class="form-control" placeholder="Masukkan limit" required>
+                <input type="text" name="levels[${idx}][amount_limit]" class="form-control amount-limit" value="Rp. 0" required>
             </div>
             <div class="col-md-3 text-end">
                 <label>&nbsp;</label><br>
@@ -112,7 +155,6 @@ function levelHtml(idx) {
                 </button>
             </div>
         </div>
-
         <div class="user-pair-container" id="pair-container-${idx}">
             ${userPairRowHtml(idx, 0)}
         </div>
@@ -132,18 +174,18 @@ function initSelect2(container) {
 $(function() {
     const container = $('#levels-container');
 
-    // level pertama
+    // Tambah level pertama
     container.append(levelHtml(levelIndex));
     initSelect2(container);
 
-    // tambah level baru
+    // Tambah level baru
     $('#add-level').click(function() {
         levelIndex++;
         container.append(levelHtml(levelIndex));
         initSelect2(container);
     });
 
-    // hapus level
+    // Hapus level
     $(document).on('click', '.remove-level', function() {
         $(this).closest('.level-card').remove();
         $('#levels-container .level-card').each(function(i, el) {
@@ -157,7 +199,7 @@ $(function() {
         levelIndex = $('#levels-container .level-card').length - 1;
     });
 
-    // tambah pair requester-approver
+    // Tambah pair requester/approver
     $(document).on('click', '.add-pair', function() {
         const levelIdx = $(this).data('level');
         const pairContainer = $(`#pair-container-${levelIdx}`);
@@ -166,7 +208,7 @@ $(function() {
         initSelect2(pairContainer);
     });
 
-    // hapus pair requester-approver
+    // Hapus pair
     $(document).on('click', '.remove-pair', function() {
         $(this).closest('.user-pair').remove();
     });

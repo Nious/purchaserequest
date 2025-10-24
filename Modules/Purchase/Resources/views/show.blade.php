@@ -110,29 +110,31 @@
 
             {{-- ==== Tabel Produk ==== --}}
             <div class="mt-4">
-                <h5 class="fw-bold mb-2 text-secondary">Product List</h5>
+                <h5 class="fw-bold mb-2 text-dark">Product List</h5>
                 <div class="table-responsive">
-                    <table class="table table-striped align-middle">
-                        <thead class="table-light">
+                    <table class="table table-striped table-bordered">
+                        <thead class="thead-dark">
                             <tr>
                                 <th>Product</th>
                                 <th>Code</th>
-                                <th>Price</th>
-                                <th>Quantity</th>
-                                <th>UOM</th>
-                                <th>Sub Total</th>
+                                <th class="text-center">Quantity</th>
+                                <th class="text-center">UOM</th>
+                                <th class="text-right">Unit Price</th>
+                                <th class="text-right">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @foreach($purchase->purchaseDetails as $item)
-                            <tr>
-                                <td>{{ $item->product_name }}</td>
-                                <td>{{ $item->product_code }}</td>
-                                <td>{{ format_currency($item->unit_price) }}</td>
-                                <td>{{ $item->quantity }}</td>
-                                <td>{{ optional($item->product)->unit ?? '' }}</td>
-                                <td>{{ format_currency($item->sub_total) }}</td>
-                            </tr>
+                            @foreach($purchase->purchaseDetails as $detail)
+                                <tr>
+                                    <td>{{ $detail->product_name }}</td>
+                                    <td>{{ $detail->product_code }}</td>
+                                    <td class="text-center">{{ $detail->quantity }}</td>
+                                    <td class="text-center">
+                                        <span class="badge badge-info">{{ $detail->product->product_unit ?? '-' }}</span>
+                                    </td>
+                                    <td class="text-right">{{ format_currency($detail->unit_price) }}</td>
+                                    <td class="text-right">{{ format_currency($detail->sub_total) }}</td>
+                                </tr>
                             @endforeach
                         </tbody>
                     </table>
@@ -142,11 +144,11 @@
             {{-- ==== Ringkasan Budget ==== --}}
             <div class="card border-0 shadow-sm mt-4">
                 <div class="card-body">
-                    <h5 class="fw-bold mb-3 text-secondary">Budget Summary</h5>
+                    <h5 class="fw-bold mb-3 text-dark">Budget Summary</h5>
 
                     @php $remaining = $purchase->master_budget_remaining; @endphp
 
-                    <table class="table table-borderless">
+                    <table class="table table-striped">
                         <tr>
                             <th class="text-start text-muted">Grand Total</th>
                             <td class="text-end fw-bold">{{ format_currency($purchase->total_amount) }}</td>

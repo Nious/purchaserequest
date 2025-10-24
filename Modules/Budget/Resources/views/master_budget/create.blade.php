@@ -169,14 +169,13 @@ $(function () {
                     </select>
                 </td>
                 <td><input type="text" name="items[${rowIndex}][category_name]" class="form-control category-name" readonly></td>
-                <td><input type="number" name="items[${rowIndex}][budget]" class="form-control budget-input" value="0"></td>
+                <td><input type="text" name="items[${rowIndex}][budget]" class="form-control budget-input text-end" value="Rp 0"></td>
                 <td class="text-center">
                     <button type="button" class="btn btn-danger btn-sm remove-row">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
-            </tr>
-        `;
+            </tr>`;
         $('#budget-table tbody').append(row);
         rowIndex++;
     });

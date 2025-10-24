@@ -303,4 +303,4 @@ class PurchaseController extends Controller
         toast('Purchase Deleted!', 'warning');
         return redirect()->route('purchases.index');
     }
-}   
+}

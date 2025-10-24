@@ -11,46 +11,47 @@ use Illuminate\Support\Facades\DB;
 class ApprovalEngine
 {
     /**
-     * Membuat Approval Request baru berdasarkan ApprovalType dan Rule yang berlaku.
+     * Membuat Approval Request baru berdasarkan Approval Type dan Rule yang berlaku.
      */
     public function createRequest($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy)
     {
         return DB::transaction(function () use ($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy) {
-            // cari rule yang cocok
-            $rule = ApprovalRule::where('approval_types_id', $approvalTypesId)
+
+            // 🔍 Cari level rule yang sesuai berdasarkan amount
+            $ruleLevel = ApprovalRuleLevel::whereHas('rule', function ($q) use ($approvalTypesId) {
+                    $q->where('approval_types_id', $approvalTypesId)
+                      ->where('is_active', true);
+                })
                 ->where('amount_limit', '>=', $amount)
-                ->where('is_active', true)
+                ->orderBy('level', 'asc')
                 ->first();
 
-            if (!$rule) {
-                throw new \Exception('Approval rule not found for this amount.');
+            if (!$ruleLevel) {
+                throw new \Exception('Approval rule level not found for this amount.');
             }
 
-            // buat request
+            // ambil rule utamanya
+            $rule = $ruleLevel->rule;
+
+            // 🆕 Buat Approval Request baru
             $approvalRequest = ApprovalRequest::create([
                 'approval_types_id' => $approvalTypesId,
                 'requestable_type' => $modelClass,
                 'requestable_id' => $modelId,
                 'requested_by' => $requestedBy,
                 'status' => ApprovalRequest::STATUS_PENDING,
-                'current_level' => 1,
+                'current_level' => $ruleLevel->level,
             ]);
 
-            // buat log untuk level pertama
-            $level = ApprovalRuleLevel::where('approval_rules_id', $rule->id)
-                ->orderBy('level')
-                ->first();
+            // 🔁 Buat log untuk level pertama
+            $approvers = ApprovalRuleUser::where('approval_rule_levels_id', $ruleLevel->id)->get();
 
-            if ($level) {
-                $approvers = ApprovalRuleUser::where('approval_rule_levels_id', $level->id)->get();
-
-                foreach ($approvers as $approver) {
-                    $approvalRequest->logs()->create([
-                        'level' => $level->level,
-                        'approver_id' => $approver->user_id,
-                        'status' => 'waiting',
-                    ]);
-                }
+            foreach ($approvers as $approver) {
+                $approvalRequest->logs()->create([
+                    'level' => $ruleLevel->level,
+                    'approver_id' => $approver->user_id,
+                    'status' => 'waiting',
+                ]);
             }
 
             return $approvalRequest;
@@ -58,11 +59,12 @@ class ApprovalEngine
     }
 
     /**
-     * Memproses approval (approve / reject).
+     * Proses approval atau reject.
      */
     public function process($approvalRequest, $userId, $action, $note = null)
     {
         return DB::transaction(function () use ($approvalRequest, $userId, $action, $note) {
+
             $log = $approvalRequest->logs()
                 ->where('approver_id', $userId)
                 ->where('level', $approvalRequest->current_level)
@@ -72,6 +74,7 @@ class ApprovalEngine
                 throw new \Exception('You are not authorized to approve this request.');
             }
 
+            // update log
             $log->update([
                 'status' => $action,
                 'note' => $note,
@@ -85,21 +88,22 @@ class ApprovalEngine
                 return $approvalRequest;
             }
 
-            // jika semua di level ini sudah approve, naik ke level berikutnya
+            // cek apakah masih ada approver yang belum approve di level ini
             $pending = $approvalRequest->logs()
                 ->where('level', $approvalRequest->current_level)
                 ->where('status', 'waiting')
                 ->count();
 
+            // jika semua sudah approve di level ini
             if ($pending == 0) {
                 $nextLevel = $approvalRequest->current_level + 1;
 
-                $nextLevelData = \Modules\Approval\Entities\ApprovalRuleLevel::where('approval_rules_id', $approvalRequest->type->rules->id)
+                $nextLevelData = ApprovalRuleLevel::where('approval_rules_id', $approvalRequest->type->rules->id)
                     ->where('level', $nextLevel)
                     ->first();
 
                 if ($nextLevelData) {
-                    // buat log untuk next level
+                    // Buat log untuk level berikutnya
                     foreach ($nextLevelData->users as $nextUser) {
                         $approvalRequest->logs()->create([
                             'level' => $nextLevel,
@@ -107,9 +111,11 @@ class ApprovalEngine
                             'status' => 'waiting',
                         ]);
                     }
+
+                    // update level
                     $approvalRequest->update(['current_level' => $nextLevel]);
                 } else {
-                    // kalau tidak ada level berikutnya
+                    // jika tidak ada level berikutnya, berarti selesai → approved
                     $approvalRequest->update(['status' => 'approved']);
                     $this->syncStatusToSource($approvalRequest);
                 }
@@ -120,7 +126,8 @@ class ApprovalEngine
     }
 
     /**
-     * Sinkronkan status ke model sumber (misal MasterBudget)
+     * Sinkronkan status Approval ke model sumber (misal MasterBudget).
+     * Model sumber wajib punya kolom "status".
      */
     protected function syncStatusToSource(ApprovalRequest $approvalRequest)
     {
@@ -136,12 +143,12 @@ class ApprovalEngine
         $model->update(['status' => $status]);
     }
 
+    /**
+     * Approve cepat (untuk admin override).
+     */
     public function approve(ApprovalRequest $request, $user)
     {
         $request->update(['status' => 'approved']);
         $this->syncStatusToSource($request);
     }
-
-
-
 }
