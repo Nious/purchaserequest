@@ -146,7 +146,8 @@
                 <div class="card-body">
                     <h5 class="fw-bold mb-3 text-dark">Budget Summary</h5>
 
-                    @php $remaining = $purchase->master_budget_remaining; @endphp
+                    {{-- Gunakan variabel baru --}}
+                    @php $remainingAfterThisPR = $sisaBudgetSetelahPRIni; @endphp 
 
                     <table class="table table-striped">
                         <tr>
@@ -155,12 +156,14 @@
                         </tr>
                         <tr>
                             <th class="text-start text-muted">Budget</th>
-                            <td class="text-end fw-bold">{{ format_currency($purchase->master_budget_value) }}</td>
+                            <td class="text-end fw-bold">{{ format_currency($currentRemainingBudget) }}</td>
                         </tr>
                         <tr>
-                            <th class="text-start text-muted">Sisa Budget</th>
-                            <td class="text-end fw-bold" style="color: {{ $remaining < 0 ? 'red' : 'green' }}">
-                                {{ format_currency($remaining) }}
+                            {{-- Ubah label agar lebih jelas --}}
+                            <th class="text-start text-muted">Sisa Budget (Jika PR Ini Disetujui)</th> 
+                            <td class="text-end fw-bold" style="color: {{ $remainingAfterThisPR < 0 ? 'red' : 'green' }}">
+                                {{-- Tampilkan hasil perhitungan baru --}}
+                                {{ format_currency($remainingAfterThisPR) }} 
                             </td>
                         </tr>
                     </table>

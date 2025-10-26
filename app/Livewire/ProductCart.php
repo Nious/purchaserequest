@@ -6,13 +6,16 @@ use Livewire\Component;
 use Gloudemans\Shoppingcart\Facades\Cart;
 use Modules\Product\Entities\Product;
 use Modules\Budget\Entities\MasterBudget;
+use Carbon\Carbon;
 
 class ProductCart extends Component
 {
-    public $listeners = ['productSelected', 'discountModalRefresh'];
+    public $listeners = ['productSelected', 'discountModalRefresh', 'purchaseDateChanged'];
 
     public $cart_instance;
     public $budget_id;
+    public $department_id;
+    public $purchase_date;
 
     public $global_discount;
     public $global_tax;
@@ -29,13 +32,13 @@ class ProductCart extends Component
     public $sisa_budget = 0;
 
     private $product;
-    public $department_id;
 
-    public function mount($cartInstance = 'purchase', $budgetId = null, $departmentId = null, $data = null)
+    public function mount($cartInstance = 'purchase', $budgetId = null, $departmentId = null, $purchaseDate = null, $data = null)
     {
         $this->cart_instance = $cartInstance;
         $this->budget_id = $budgetId;
         $this->department_id = $departmentId;
+        $this->purchase_date = $purchaseDate ?? now()->format('Y-m-d');
 
         // Bersihkan cart lama
         Cart::instance($this->cart_instance)->destroy();
@@ -131,20 +134,24 @@ class ProductCart extends Component
 
         // Ambil budget berdasarkan department dan bulan saat ini
         if ($this->department_id) {
-            $currentMonth = now()->month;
-            $currentYear = now()->year;
+            $purchaseDateObj = Carbon::parse($this->purchase_date);
+            $month = $purchaseDateObj->month;
+            $year = $purchaseDateObj->year;
         
-            // Langsung jumlahkan kolom 'grandtotal' dari semua budget yang cocok
-            $totalBudget = MasterBudget::where('department_id', $this->department_id)
-                                       ->where('bulan', $currentMonth)
-                                       ->whereYear('periode_awal', $currentYear)
-                                       ->where('status', 'approved')
-                                       ->sum('grandtotal'); // <-- Menjumlahkan semua data ➕
-            
-            // Set properti budget dengan total yang didapat
-            $this->budget = $totalBudget;
-        
-            // Catatan: $this->budget_id tidak di-set karena kita mengambil total dari banyak budget, bukan satu.
+            // Query pertama untuk menjumlahkan grandtotal
+            $totalGrandtotal = MasterBudget::where('department_id', $this->department_id)
+                ->where('bulan', $month)
+                ->where('status', 'approved')
+                ->sum('grandtotal');
+
+            // Query kedua untuk menjumlahkan used_amount
+            $totalUsedAmount = MasterBudget::where('department_id', $this->department_id)
+                ->where('bulan', $month)
+                ->where('status', 'approved')
+                ->sum('used_amount');
+
+            // Hitung selisihnya di PHP
+            $this->budget = $totalGrandtotal - $totalUsedAmount;
         }
 
         $this->sisa_budget = $this->budget - $this->grand_total;

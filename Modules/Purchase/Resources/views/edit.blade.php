@@ -11,8 +11,8 @@
 @endsection
 
 @php
-    // Definisikan departmentId di satu tempat agar bersih
-    $departmentId = auth()->user()->department_id;
+    $departmentId = $purchase->department_id ?? '';
+    $purchaseDateValue = old('date', now()->format('Y-m-d'));
 @endphp
 
 @section('content')
@@ -50,9 +50,9 @@
                                 <div class="form-group">
                                     <label for="department_id">Department <span class="text-danger">*</span></label>
                                     <input type="text" class="form-control" 
-                                        value="{{ optional(auth()->user()->department)->department_name ?? '-' }}" readonly>
+                                           value="{{ optional($purchase->department)->department_name ?? '-' }}" readonly>
                                     <input type="hidden" name="department_id" 
-                                        value="{{ optional(auth()->user()->department)->id ?? '' }}">
+                                           value="{{ $purchase->department_id ?? '' }}">
                                 </div>
                             </div>
 
@@ -60,8 +60,10 @@
                             <div class="col-lg-4">
                                 <div class="form-group">
                                     <label for="users_id">Requester <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" value="{{ auth()->user()->name }}" readonly>
-                                    <input type="hidden" name="users_id" value="{{ auth()->id() }}">
+                                    <input type="text" class="form-control" 
+                                           value="{{ optional($purchase->user)->name ?? '-' }}" readonly> 
+                                    <input type="hidden" name="users_id" 
+                                           value="{{ $purchase->users_id ?? '' }}">
                                 </div>
                             </div>
 
@@ -81,7 +83,7 @@
                         </div>
 
                         {{-- Product Cart --}}
-                        <livewire:product-cart :cartInstance="'purchase'" :data="$purchase" :departmentId="$departmentId" />
+                        <livewire:product-cart :cartInstance="'purchase'" :data="$purchase" :departmentId="$departmentId" :purchaseDate="$purchaseDateValue" />
 
                         {{-- ====== Ringkasan Budget ====== --}}
                         <div class="card border-0 shadow-sm mt-4">

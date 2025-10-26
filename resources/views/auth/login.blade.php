@@ -14,7 +14,7 @@
     <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
 </head>
-3q1
+
 <body class="c-app flex-row align-items-center">
 <div class="container">
     <div class="row mb-3">

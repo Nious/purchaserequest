@@ -31,26 +31,14 @@ class MasterBudgetsDataTable extends DataTable
                 return $data->remaining_formatted;
             })
             ->addColumn('approval', function ($data) {
-                $status = $data->status ?? 'Pending';
-
-                if ($status === 'Pending') {
-                    return '
-                        <div class="dropdown">
-                            <button class="btn btn-warning btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                Pending
-                            </button>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item approve-btn" href="#" data-id="'.$data->id.'">Approve</a></li>
-                                <li><a class="dropdown-item reject-btn" href="#" data-id="'.$data->id.'">Reject</a></li>
-                            </ul>
-                        </div>
-                    ';
-                }
-
+                // Ambil status, default ke 'pending', dan ubah ke huruf kecil
+                $status = strtolower($data->status ?? 'pending');
+            
+                // Tampilkan badge berdasarkan status
                 return match ($status) {
-                    'Approved' => '<span class="badge bg-success">Approved</span>',
-                    'Rejected' => '<span class="badge bg-danger">Rejected</span>',
-                    default    => '<span class="badge bg-warning text-dark">Pending</span>',
+                    'approved' => '<span class="badge bg-success">approved</span>',
+                    'rejected' => '<span class="badge bg-danger">rejected</span>',
+                    default    => '<span class="badge bg-warning text-dark">pending</span>', // Menangani 'pending' atau status tak terduga
                 };
             })
 

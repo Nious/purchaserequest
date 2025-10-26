@@ -6,13 +6,13 @@
 <ol class="breadcrumb border-0 m-0">
     <li class="breadcrumb-item"><a href="{{ route('home') }}">Home</a></li>
     <li class="breadcrumb-item"><a href="{{ route('purchases.index') }}">Purchases</a></li>
-    <li class="breadcrumb-item active">Edit</li>
+    <li class="breadcrumb-item active">Create</li>
 </ol>
 @endsection
 
 @php
-    // Definisikan departmentId di satu tempat agar bersih
     $departmentId = auth()->user()->department_id;
+    $purchaseDateValue = old('date', now()->format('Y-m-d'));
 @endphp
 
 @section('content')
@@ -79,33 +79,35 @@
                         </div>
 
                         {{-- Product Cart --}}
-                        <livewire:product-cart :cartInstance="'purchase'" :departmentId="$departmentId" />
+                        <livewire:product-cart :cartInstance="'purchase'" :departmentId="$departmentId" :purchaseDate="$purchaseDateValue" />
 
                             {{-- ====== Ringkasan Budget ====== --}}
                             <div class="card border-0 shadow-sm">
                                 <div class="card-body">
                                     <h5 class="fw-bold mb-3 text-secondary">Budget Summary</h5>
-
-                                        <table class="table table-borderless">
-                                            <tr>
-                                                <th class="text-start text-muted">Grand Total</th>
-                                                <td class="text-end fw-bold" id="grand_total_display">Rp0</td>
-                                            </tr>
-                                            <tr>
-                                                <th class="text-start text-muted">Budget</th>
-                                                <td class="text-end fw-bold" id="budget_display">Rp0</td>
-                                            </tr>
-                                            <tr>
-                                                <th class="text-start text-muted">Sisa Budget</th>
-                                                <td class="text-end fw-bold text-success" id="sisa_budget_display">Rp0</td>
-                                            </tr>
-                                        </table>
-
-                                        {{-- Hidden input untuk dikirim ke Controller --}}
-                                        <input type="hidden" name="total_amount" id="total_amount" value="0">
-                                        <input type="hidden" name="master_budget_value" id="master_budget_value" value="0">
-                                        <input type="hidden" name="master_budget_remaining" id="master_budget_remaining" value="0">
-                                    </div>
+    
+                                    <table class="table table-borderless">
+                                        <tr>
+                                            <th class="text-start text-muted">Grand Total</th>
+                                            {{-- Biarkan JavaScript yang mengisi --}}
+                                            <td class="text-end fw-bold" id="grand_total_display">Rp0</td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-start text-muted">Budget</th>
+                                             {{-- Biarkan JavaScript yang mengisi --}}
+                                            <td class="text-end fw-bold" id="budget_display">Rp0</td>
+                                        </tr>
+                                        <tr>
+                                            <th class="text-start text-muted">Sisa Budget</th>
+                                             {{-- Biarkan JavaScript yang mengisi, set kelas awal ke success --}}
+                                            <td class="text-end fw-bold text-success" id="sisa_budget_display">Rp0</td>
+                                        </tr>
+                                    </table>
+    
+                                    {{-- Hidden input untuk Controller --}}
+                                    <input type="hidden" name="total_amount" id="total_amount" value="0">
+                                    <input type="hidden" name="master_budget_value" id="master_budget_value" value="0">
+                                    <input type="hidden" name="master_budget_remaining" id="master_budget_remaining" value="0">
                                 </div>
 
                                 {{-- ====== Tombol Submit ====== --}}
@@ -123,7 +125,7 @@
 @endsection
 
 
-@push('scripts')
+@push('page_scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
@@ -161,6 +163,7 @@ document.addEventListener('livewire:init', () => {
         document.getElementById('total_amount').value = total;
         document.getElementById('master_budget_value').value = budget;
         document.getElementById('master_budget_remaining').value = remaining;
+
     });
 });
 
@@ -197,7 +200,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 title: 'Buat Purchase Request?',
                 text: 'Apakah kamu yakin ingin mengirim PR ini?',
                 icon: 'question',
-                showCancelButton: true,7
+                showCancelButton: true,
                 confirmButtonText: 'Ya',
                 cancelButtonText: 'Batal',
                 reverseButtons: true,
