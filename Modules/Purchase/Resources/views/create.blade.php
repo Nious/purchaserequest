@@ -83,7 +83,7 @@
 
                             {{-- ====== Ringkasan Budget ====== --}}
                             <div class="card border-0 shadow-sm">
-                                <div class="card-body">
+                                <div class="card-body table-responsive">
                                     <h5 class="fw-bold mb-3 text-secondary">Budget Summary</h5>
     
                                     <table class="table table-borderless">
@@ -93,7 +93,7 @@
                                             <td class="text-end fw-bold" id="grand_total_display">Rp0</td>
                                         </tr>
                                         <tr>
-                                            <th class="text-start text-muted">Budget</th>
+                                            <th class="text-start text-muted">Budget {{ optional(auth()->user()->department)->department_name ?? '-' }}</th>
                                              {{-- Biarkan JavaScript yang mengisi --}}
                                             <td class="text-end fw-bold" id="budget_display">Rp0</td>
                                         </tr>
@@ -165,6 +165,17 @@ document.addEventListener('livewire:init', () => {
         document.getElementById('master_budget_remaining').value = remaining;
 
     });
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const dateInput = document.querySelector('input[name="date"]');
+    if (dateInput) {
+        dateInput.addEventListener('change', function() {
+            const newDate = this.value;
+            console.log('Tanggal berubah:', newDate);
+            Livewire.dispatch('dateChanged', { date: newDate });
+        });
+    }
 });
 
 // === Konfirmasi sebelum submit dengan pengecekan budget ===

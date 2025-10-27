@@ -286,34 +286,34 @@ class PurchaseController extends Controller
      * Show detail purchase.
      */
     public function show($id)
-{
-    $purchase = Purchase::with(['purchaseDetails.product', 'department', 'user'])->findOrFail($id);
+    {
+        $purchase = Purchase::with(['purchaseDetails.product', 'department', 'user'])->findOrFail($id);
 
-    $currentRemainingBudget = 0;
+        $currentRemainingBudget = 0;
 
-    if ($purchase->department_id && $purchase->date) {
-        $purchaseDateObj = Carbon::parse($purchase->date);
-        $month = $purchaseDateObj->month;
-        $year = $purchaseDateObj->year;
+        if ($purchase->department_id && $purchase->date) {
+            $purchaseDateObj = Carbon::parse($purchase->date);
+            $month = $purchaseDateObj->month;
+            $year = $purchaseDateObj->year;
 
-        $result = MasterBudget::where('department_id', $purchase->department_id)
-                              ->where('bulan', $month)
-                              ->whereYear('periode_awal', $year)
-                              ->where('status', 'approved')
-                              ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used')
-                              ->first();
-        $currentRemainingBudget = ($result->total_budget ?? 0) - ($result->total_used ?? 0); 
-        $sisaBudgetSetelahPRIni = ($currentRemainingBudget ?? 0) - $purchase->total_amount;
+            $result = MasterBudget::where('department_id', $purchase->department_id)
+                                ->where('bulan', $month)
+                                ->whereYear('periode_awal', $year)
+                                ->where('status', 'approved')
+                                ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used')
+                                ->first();
+            $currentRemainingBudget = ($result->total_budget ?? 0) - ($result->total_used ?? 0); 
+            $sisaBudgetSetelahPRIni = ($currentRemainingBudget ?? 0) - $purchase->total_amount;
+        }
+        // --- BATAS TAMBAHAN ---
+
+        // Kirim data budget terkini ke view
+        return view('purchase::show', compact(
+            'purchase', 
+            'currentRemainingBudget', 
+            'sisaBudgetSetelahPRIni'
+        ));
     }
-    // --- BATAS TAMBAHAN ---
-
-    // Kirim data budget terkini ke view
-    return view('purchase::show', compact(
-        'purchase', 
-        'currentRemainingBudget', 
-        'sisaBudgetSetelahPRIni'
-    ));
-}
 
     /**
      * Delete purchase.

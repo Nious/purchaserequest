@@ -143,7 +143,7 @@
 
             {{-- ==== Ringkasan Budget ==== --}}
             <div class="card border-0 shadow-sm mt-4">
-                <div class="card-body">
+                <div class="card-body table-responsive">
                     <h5 class="fw-bold mb-3 text-dark">Budget Summary</h5>
 
                     {{-- Gunakan variabel baru --}}
@@ -155,7 +155,7 @@
                             <td class="text-end fw-bold">{{ format_currency($purchase->total_amount) }}</td>
                         </tr>
                         <tr>
-                            <th class="text-start text-muted">Budget</th>
+                            <th class="text-start text-muted">Budget {{ optional($purchase->department)->department_name ?? '-' }}</th>
                             <td class="text-end fw-bold">{{ format_currency($currentRemainingBudget) }}</td>
                         </tr>
                         <tr>

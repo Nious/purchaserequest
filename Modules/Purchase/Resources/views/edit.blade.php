@@ -12,7 +12,7 @@
 
 @php
     $departmentId = $purchase->department_id ?? '';
-    $purchaseDateValue = old('date', now()->format('Y-m-d'));
+    $purchaseDateValue = old('date', $purchase->date);
 @endphp
 
 @section('content')
@@ -87,7 +87,7 @@
 
                         {{-- ====== Ringkasan Budget ====== --}}
                         <div class="card border-0 shadow-sm mt-4">
-                            <div class="card-body">
+                            <div class="card-body table-responsive">
                                 <h5 class="fw-bold mb-3 text-secondary">Budget Summary</h5>
 
                                 <table class="table table-borderless">
@@ -98,7 +98,7 @@
                                         </td>
                                     </tr>
                                     <tr>
-                                        <th class="text-start text-muted">Budget</th>
+                                        <th class="text-start text-muted">Budget {{ optional($purchase->department)->department_name ?? '-' }}</th>
                                         <td class="text-end fw-bold" id="budget_display">
                                             Rp{{ number_format($purchase->master_budget_value ?? 0, 0, ',', '.') }}
                                         </td>
@@ -167,6 +167,17 @@ document.addEventListener('livewire:init', () => {
         document.getElementById('master_budget_value').value = payload.master_budget_value;
         document.getElementById('master_budget_remaining').value = payload.master_budget_remaining;
     });
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+    const dateInput = document.querySelector('input[name="date"]');
+    if (dateInput) {
+        dateInput.addEventListener('change', function() {
+            const newDate = this.value;
+            console.log('Tanggal berubah:', newDate);
+            Livewire.dispatch('dateChanged', { date: newDate });
+        });
+    }
 });
 
 document.addEventListener('DOMContentLoaded', function () {
