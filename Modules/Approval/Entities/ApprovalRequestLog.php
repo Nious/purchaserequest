@@ -10,15 +10,15 @@ class ApprovalRequestLog extends Model
     protected $fillable = [
         'approval_request_id',
         'level',
-        'approver_id',
-        'status',
-        'note',
+        'user_id',
+        'acction',
+        'comment',
         'processed_at',
     ];
 
     public function approver()
     {
-        return $this->belongsTo(User::class, 'approver_id');
+        return $this->belongsTo(User::class, 'user_id');
     }
 
     public function approvalRequest()

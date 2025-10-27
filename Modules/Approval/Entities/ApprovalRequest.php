@@ -15,11 +15,13 @@ class ApprovalRequest extends Model
     protected $fillable = [
         'approval_types_id',
         'requestable_type',
+        'approval_rules_id',
         'requestable_id',
         'requested_by',
         'amount',
         'status',
         'current_level',
+        'created_by',
         'note',
     ];
 

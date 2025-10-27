@@ -17,53 +17,102 @@ class ApprovalEngine
     {
         return DB::transaction(function () use ($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy) {
 
-            $ruleLevel = ApprovalRuleLevel::whereHas('rule', function ($q) use ($approvalTypesId) {
-                $q->where('approval_types_id', $approvalTypesId)->where('is_active', true);
-            })
-            ->where('amount_limit', '>=', $amount)
-            ->orderBy('level', 'asc')
-            ->first();
+            // ---TEMUKAN ATURAN (RULE) YANG AKTIF ---
+            $activeRule = ApprovalRule::where('approval_types_id', $approvalTypesId)
+                                      ->where('is_active', true)
+                                      ->first();
 
-            // Jika tidak ada level yang butuh approval (amount di bawah limit terendah)
-            if (!$ruleLevel) {
-                // Buat request dengan status langsung 'approved'
-                $approvalRequest = ApprovalRequest::create([
-                    'approval_types_id' => $approvalTypesId,
-                    'requestable_type'  => $modelClass,
-                    'requestable_id'    => $modelId,
-                    'created_by'        => $requestedBy,
-                    'amount'            => $amount,
-                    'status'            => 'approved', // Langsung approved
-                    'current_level'     => null, // Tidak ada level approval
-                    'approval_rules_id' => null, // Tidak ada rule yang terpakai
-                ]);
-                $this->syncStatusToSource($approvalRequest); // Langsung sinkronkan status
-                return $approvalRequest;
+            // Jika tidak ada aturan aktif sama sekali untuk tipe ini
+            if (!$activeRule) {
+                // Opsi 1: Gagal dan beri error
+                // throw new \Exception("Tidak ada aturan approval aktif untuk tipe ini.");
+
+                // Opsi 2: Langsung setujui (Auto-approve)
+                return $this->createAutoApprovedRequest($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy);
             }
-            
-            // Buat Approval Request baru dengan status 'pending'
+
+            // Cari level terendah di mana amount_limit >= amount yang diajukan.
+            // Ini akan secara otomatis "melewati" level yang limitnya lebih rendah.
+            $startingLevel = ApprovalRuleLevel::where('approval_rules_id', $activeRule->id)
+                ->where('amount_limit', '>=', $amount)
+                ->orderBy('level', 'asc')
+                ->first();
+
+            // Ini terjadi jika `amount` lebih rendah dari `amount_limit` terendah.
+            if (!$startingLevel) {
+                return $this->createAutoApprovedRequest($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy, $activeRule->id);
+            }
+
             $approvalRequest = ApprovalRequest::create([
                 'approval_types_id' => $approvalTypesId,
+                'approval_rules_id' => $activeRule->id,
                 'requestable_type'  => $modelClass,
                 'requestable_id'    => $modelId,
                 'created_by'        => $requestedBy,
                 'amount'            => $amount,
                 'status'            => 'pending',
-                'current_level'     => $ruleLevel->level,
-                'approval_rules_id' => $ruleLevel->approval_rules_id,
+                'current_level'     => $startingLevel->level,
             ]);
 
-            // Buat log untuk level pertama menggunakan relasi
-            foreach ($ruleLevel->users as $approver) {
+            // Temukan data 'requester' di tabel 'approval_rule_users' yang cocok dengan user pembuat
+            $requesterRule = ApprovalRuleUser::where('approval_rule_levels_id', $startingLevel->id)
+                                 ->where('role', 'requester')
+                                 ->where('user_id', $requestedBy)
+                                 ->first();
+
+            // Jika pembuat (requester) tidak ditemukan di dalam aturan approval
+            if (!$requesterRule) {
+                // Batalkan transaksi dan lempar error, karena tidak ada alur approval yang cocok
+                throw new \Exception("Alur approval tidak ditemukan untuk requester ini di level {$startingLevel->level}.");
+            }
+
+            // Ambil sequence dari requester yang ditemukan
+            $targetSequence = $requesterRule->sequence;
+
+            // Cari SEMUA approver di level yang sama DAN sequence yang sama
+            $approvers = ApprovalRuleUser::where('approval_rule_levels_id', $startingLevel->id)
+                                        ->where('role', 'approver')
+                                        ->where('sequence', $targetSequence)
+                                        ->get();
+
+            // Jika tidak ada approver yang cocok di sequence ini
+            if ($approvers->isEmpty()) {
+                throw new \Exception("Tidak ada approver yang ditemukan untuk requester ini di sequence {$targetSequence}, level {$startingLevel->level}.");
+            }
+
+            // Buat log tugas untuk approver yang ditemukan
+            foreach ($approvers as $approver) {
                 $approvalRequest->logs()->create([
-                    'level'   => $ruleLevel->level,
-                    'user_id' => $approver->user_id, // ✅ DIPERBAIKI
+                    'level'   => $startingLevel->level,
+                    'user_id' => $approver->user_id,
                     'action'  => 'assigned',
                 ]);
             }
 
             return $approvalRequest;
         });
+    }
+
+    /**
+     * Helper method untuk membuat request yang langsung disetujui.
+     */
+    private function createAutoApprovedRequest($modelClass, $modelId, $approvalTypesId, $amount, $requestedBy, $ruleId = null)
+    {
+        $approvalRequest = ApprovalRequest::create([
+            'approval_types_id' => $approvalTypesId,
+            'approval_rules_id' => $ruleId, // Bisa null jika tidak ada rule aktif
+            'requestable_type'  => $modelClass,
+            'requestable_id'    => $modelId,
+            'created_by'        => $requestedBy,
+            'amount'            => $amount,
+            'status'            => 'approved', // Langsung approved
+            'current_level'     => 0, // Level 0 menandakan tidak ada proses approval
+        ]);
+        
+        // Langsung sinkronkan status 'Approved' ke model aslinya (MasterBudget)
+        $this->syncStatusToSource($approvalRequest); 
+        
+        return $approvalRequest;
     }
 
     /**
@@ -151,8 +200,23 @@ class ApprovalEngine
     /**
      * Approve cepat (untuk admin override).
      */
-    public function approve(ApprovalRequest $request, $user)
+    // public function approve(ApprovalRequest $request, $user)
+    // {
+    //     $request->update(['status' => 'approved']);
+    //     $this->syncStatusToSource($request);
+    // }
+
+    public function forceApprove(ApprovalRequest $request, int $userId, string $note = 'Force Approved by Admin')
     {
+        // Catat log bahwa admin melakukan override
+        $request->logs()->create([
+            'level'       => $request->current_level ?? 0,
+            'user_id'     => $userId,
+            'action'      => 'approved',
+            'comment'     => $note,
+        ]);
+
+        // Update status utama
         $request->update(['status' => 'approved']);
         $this->syncStatusToSource($request);
     }

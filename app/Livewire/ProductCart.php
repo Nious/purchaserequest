@@ -7,10 +7,12 @@ use Gloudemans\Shoppingcart\Facades\Cart;
 use Modules\Product\Entities\Product;
 use Modules\Budget\Entities\MasterBudget;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProductCart extends Component
 {
-    public $listeners = ['productSelected', 'discountModalRefresh', 'purchaseDateChanged'];
+    public $listeners = ['productSelected', 'discountModalRefresh', 'purchaseDateChanged', 'dateChanged' => 'handleDateChange'];
 
     public $cart_instance;
     public $budget_id;
@@ -141,17 +143,25 @@ class ProductCart extends Component
             // Query pertama untuk menjumlahkan grandtotal
             $totalGrandtotal = MasterBudget::where('department_id', $this->department_id)
                 ->where('bulan', $month)
+                ->whereYear('periode_awal', $year)
                 ->where('status', 'approved')
                 ->sum('grandtotal');
 
             // Query kedua untuk menjumlahkan used_amount
             $totalUsedAmount = MasterBudget::where('department_id', $this->department_id)
                 ->where('bulan', $month)
+                ->whereYear('periode_awal', $year)
                 ->where('status', 'approved')
                 ->sum('used_amount');
 
+            $totalReservedAmount = MasterBudget::where('department_id', $this->department_id)
+                ->where('bulan', $month)
+                ->whereYear('periode_awal', $year)
+                ->where('status', 'approved')
+                ->sum('reserved_amount');
+
             // Hitung selisihnya di PHP
-            $this->budget = $totalGrandtotal - $totalUsedAmount;
+            $this->budget = $totalGrandtotal - $totalUsedAmount - $totalReservedAmount;
         }
 
         $this->sisa_budget = $this->budget - $this->grand_total;
@@ -271,4 +281,14 @@ class ProductCart extends Component
             'sub_total' => $sub_total,
         ];
     }
+
+    public function handleDateChange($date = null)
+    {
+        if ($date) {
+            $this->purchase_date = $date;
+            $this->refreshSummary();
+            \Log::info('Livewire date updated: ' . $this->purchase_date);
+        }
+    }
+
 }
