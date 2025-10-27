@@ -154,8 +154,14 @@ class ProductCart extends Component
                 ->where('status', 'approved')
                 ->sum('used_amount');
 
+            $totalReservedAmount = MasterBudget::where('department_id', $this->department_id)
+                ->where('bulan', $month)
+                ->whereYear('periode_awal', $year)
+                ->where('status', 'approved')
+                ->sum('reserved_amount');
+
             // Hitung selisihnya di PHP
-            $this->budget = $totalGrandtotal - $totalUsedAmount;
+            $this->budget = $totalGrandtotal - $totalUsedAmount - $totalReservedAmount;
         }
 
         $this->sisa_budget = $this->budget - $this->grand_total;
