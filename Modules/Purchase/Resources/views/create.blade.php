@@ -165,6 +165,7 @@ document.addEventListener('livewire:init', () => {
         document.getElementById('master_budget_remaining').value = remaining;
 
     });
+    
 });
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -185,26 +186,31 @@ document.addEventListener('DOMContentLoaded', function () {
     form.addEventListener('submit', function (e) {
         e.preventDefault(); // cegah submit langsung
 
+        const totalAmount = Number(document.getElementById('total_amount').value);
         const remaining = Number(document.getElementById('master_budget_remaining').value);
 
+        // Cek Keranjang Kosong
+        if (totalAmount <= 0) {
+            Swal.fire({
+                title: 'Keranjang Kosong!',
+                text: 'Anda harus menambahkan setidaknya satu produk untuk membuat Purchase Request.',
+                icon: 'error',
+                confirmButtonText: 'Mengerti',
+                confirmButtonColor: '#d33',
+            });
+            return; // Hentikan proses
+        }
         // Jika melebihi budget
         if (remaining < 0) {
             Swal.fire({
                 title: 'Budget Melebihi Batas!',
-                text: 'Total permintaan melebihi budget yang tersedia. Apakah kamu yakin ingin tetap membuat PR ini?',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Ya, tetap buat PR',
-                cancelButtonText: 'Batal',
-                reverseButtons: true,
-                confirmButtonColor: '#e74c3c',
-                cancelButtonColor: '#6c757d',
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    form.submit();
-                }
+                text: 'Total permintaan melebihi budget yang tersedia. Silakan kurangi item atau hubungi departemen terkait.',
+                icon: 'error',
+                confirmButtonText: 'Mengerti',
+                confirmButtonColor: '#d33',
             });
-        } 
+            // Tidak memanggil form.submit() berarti proses berhenti di sini
+        }
         // Jika masih dalam budget
         else {
             Swal.fire({

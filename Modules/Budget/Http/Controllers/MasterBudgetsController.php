@@ -12,6 +12,8 @@ use Modules\Budget\Entities\BudgetDetail;
 use Modules\Approval\Entities\ApprovalRequest;
 use Modules\Approval\Services\ApprovalEngine;
 use Illuminate\Support\Facades\Auth;
+use Modules\Approval\Entities\ApprovalType;
+use Modules\Approval\Entities\ApprovalRule;
 
 class MasterBudgetsController extends Controller
 {
@@ -51,12 +53,23 @@ class MasterBudgetsController extends Controller
         'description'    => 'nullable|string',
     ]);
 
+    $rule = ApprovalRule::whereHas('type', function ($query) {
+        $query->where('approval_name', 'Master Budget');
+    })->first();
+
+    if (!$rule) {
+        // Jika tidak ditemukan, berarti tidak ada aturan yang terhubung dengan tipe tersebut
+        return back()->withErrors(['error' => 'Aturan Approval (Approval Rule) untuk "Master Budget" tidak ditemukan atau belum dikonfigurasi.'])->withInput();
+    }
+
+    $approvalTypesId = $rule->approval_types_id;
+
     // Buat nomor budgeting otomatis
     $lastBudget = MasterBudget::orderBy('id', 'desc')->first();
     $nextNumber = $lastBudget ? (int) str_replace('BDGT', '', $lastBudget->no_budgeting) + 1 : 1;
     $noBudgeting = 'BDGT' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
-    DB::transaction(function () use ($request, $noBudgeting) {
+    DB::transaction(function () use ($request, $noBudgeting, $approvalTypesId) {
 
         // Pastikan nilai grandtotal numerik (hapus format "Rp" atau koma)
         $grandtotal = preg_replace('/[^0-9.]/', '', $request->grandtotal);
@@ -88,15 +101,18 @@ class MasterBudgetsController extends Controller
         }
         
         // 🔗 Integrasi Approval
-        $approvalTypesId = 19; // bisa hardcode dulu misal 1
-        $approval = app(\Modules\Approval\Services\ApprovalEngine::class)
-            ->createRequest(
-                MasterBudget::class,
-                $master->id,
-                $approvalTypesId,
-                $master->grandtotal,
-                auth()->id()
-            );
+        $approval = $this->approvalEngine->createRequest( // Gunakan $this->approvalEngine
+            'Master Budget',
+            $master->id,
+            $approvalTypesId,
+            $master->grandtotal,
+            auth()->id()
+        );
+
+        // (Opsional) Update status MasterBudget sesuai hasil dari engine
+        if ($master->status !== $approval->status) {
+            $master->update(['status' => $approval->status]);
+        }
 
         $master->update(['approval_request_id' => $approval->id]);
     });
