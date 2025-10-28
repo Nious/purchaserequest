@@ -5,7 +5,7 @@ namespace App\Providers;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Gate;
 use Modules\Budget\Entities\MasterBudget;
-
+use Modules\Purchase\Entities\Purchase;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -33,7 +33,12 @@ class AuthServiceProvider extends ServiceProvider
         // Atau sesuaikan dengan logic Anda
         });
         Gate::define('approve-budget', function ($user, MasterBudget $budget) {
-        return in_array($user->role, ['manager', 'finance']); 
+            // return in_array($user->role, ['manager', 'finance']);
+            return true;
+        });
+
+        Gate::define('approve_purchases', function ($user, Purchase $purchase) {
+            return true;
         });
 
         Gate::before(function ($user, $ability) {

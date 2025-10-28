@@ -19,7 +19,7 @@ class PurchaseDataTable extends DataTable
                 return $data->user ? $data->user->name : '';
             })            
             ->addColumn('department_id', function ($data) {
-                return $data->department ? $data->department->name : '';
+                return $data->department ? $data->department->department_name : '-';
             })
             ->addColumn('note', function ($data) {
                     return $data->note ? $data->note : '-';

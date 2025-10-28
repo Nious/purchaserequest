@@ -11,7 +11,7 @@ class ApprovalRequestLog extends Model
         'approval_request_id',
         'level',
         'user_id',
-        'acction',
+        'action',
         'comment',
         'processed_at',
     ];

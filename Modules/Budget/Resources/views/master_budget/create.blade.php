@@ -122,39 +122,64 @@
 @endsection
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 $(function () {
     let rowIndex = 1;
 
-    // helper: format Date object ke YYYY-MM-DD (LOKAL)
+    // Helper Tanggal
     function formatLocalDate(d) {
         const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0'); // monthIndex + 1
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    // set periode awal & akhir sesuai bulan yang dipilih
+    // Helper update periode
     function updatePeriodeFromMonth(monthNumber) {
-        // monthNumber expected 1..12
-        const year = new Date().getFullYear(); // gunakan tahun sekarang (bisa diubah jika perlu)
-        const firstDay = new Date(year, monthNumber - 1, 1);    // local midnight
-        const lastDay  = new Date(year, monthNumber, 0);        // last day of month (local)
+        const year = new Date().getFullYear();
+        const firstDay = new Date(year, monthNumber - 1, 1);
+        const lastDay  = new Date(year, monthNumber, 0);
         $('#periode_awal').val(formatLocalDate(firstDay));
         $('#periode_akhir').val(formatLocalDate(lastDay));
     }
+    
+    // Helper Rupiah
+    const formatter = new Intl.NumberFormat('id-ID', {
+        style: 'currency',
+        currency: 'IDR',
+        minimumFractionDigits: 0
+    });
+    function formatRupiah(value) {
+        return formatter.format(value || 0);
+    }
+    function parseRupiah(value) {
+        return parseInt(String(value).replace(/[^0-9]/g, '')) || 0;
+    }
 
-    // saat halaman load: gunakan value select (server sudah set default ke 1)
+    // Helper Kalkulasi Total
+    function calculateGrandtotal() {
+        let total = 0;
+        $('.budget-input').each(function () {
+            total += parseRupiah($(this).val());
+        });
+        $('#grandtotal').val(formatRupiah(total));
+    }
+
+    // Set periode awal saat load
     const initialMonth = parseInt($('#bulan').val()) || 1;
     updatePeriodeFromMonth(initialMonth);
+    
+    // Hitung total awal saat load
+    calculateGrandtotal();
 
-    // event change bulan
+    // Event change bulan
     $('#bulan').on('change', function () {
         const m = parseInt($(this).val()) || 1;
         updatePeriodeFromMonth(m);
     });
 
-    // tambah row baru (Blade options sudah dirender)
+    // Tambah row baru
     $('#add-row').on('click', function () {
         let row = `
             <tr>
@@ -180,75 +205,65 @@ $(function () {
         rowIndex++;
     });
 
-    // auto isi nama kategori dari data-name
+    // Auto isi nama kategori
     $(document).on('change', '.category-select', function () {
         const name = $(this).find(':selected').data('name') || '';
         $(this).closest('tr').find('.category-name').val(name);
     });
 
-    // hapus row
+    // Hapus row
     $(document).on('click', '.remove-row', function () {
         $(this).closest('tr').remove();
         calculateGrandtotal();
     });
 
-    // hitung grandtotal
-    $(document).on('input', '.budget-input', function () {
-        calculateGrandtotal();
-    });
-
-    function calculateGrandtotal() {
-        let total = 0;
-        $('.budget-input').each(function () {
-            total += parseFloat($(this).val()) || 0;
-        });
-        $('#grandtotal').val(total.toLocaleString());
-    }
-    $(function () {
-    let rowIndex = 1;
-
-    // formatter Rp
-    const formatter = new Intl.NumberFormat('id-ID', {
-        style: 'currency',
-        currency: 'IDR',
-        minimumFractionDigits: 0
-    });
-
-    function formatRupiah(value) {
-        return formatter.format(value || 0);
-    }
-
-    function parseRupiah(value) {
-        return parseInt(value.replace(/[^0-9]/g, '')) || 0;
-    }
-
-    // hitung grandtotal
-    function calculateGrandtotal() {
-        let total = 0;
-        $('.budget-input').each(function () {
-            total += parseRupiah($(this).val());
-        });
-        $('#grandtotal').val(formatRupiah(total));
-    }
-
-    // saat input → format ke Rp
+    // Saat input budget -> format ke Rp dan hitung ulang total
     $(document).on('input', '.budget-input', function () {
         let raw = parseRupiah($(this).val());
         $(this).val(formatRupiah(raw));
         calculateGrandtotal();
     });
 
-    // saat submit → ubah ke angka murni
-    $('form').on('submit', function () {
+    // --- VALIDASI DAN SUBMIT FORM ---
+    $('form').on('submit', function (e) {
+        let itemCount = 0;
+        let itemValid = true;
+        $('.category-select').each(function() {
+            itemCount++;
+            if ($(this).val() === "") {
+                itemValid = false;
+            }
+        });
+
+        if (itemCount === 0 || !itemValid) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Item Belum Lengkap!',
+                text: 'Anda harus menambahkan setidaknya satu item kategori dan mengisinya dengan benar.',
+                icon: 'error',
+                confirmButtonText: 'Mengerti',
+                confirmButtonColor: '#d33',
+            });
+            return;
+        }
+
         $('.budget-input').each(function () {
             $(this).val(parseRupiah($(this).val()));
         });
         $('#grandtotal').val(parseRupiah($('#grandtotal').val()));
+
     });
 
-    // init awal
-    calculateGrandtotal();
-});
+    @if ($errors->has('error'))
+        Swal.fire({
+            title: 'Gagal Menyimpan!',
+            text: '{{ $errors->first("error") }}',
+            icon: 'error',
+            confirmButtonText: 'Mengerti',
+            confirmButtonColor: '#d33',
+        });
+    @endif
+
 });
 </script>
 @endpush

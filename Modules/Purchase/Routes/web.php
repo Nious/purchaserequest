@@ -39,9 +39,15 @@ Route::group(['middleware' => 'auth'], function () {
     Route::patch('/purchase-payments/update/{purchasePayment}', 'PurchasePaymentsController@update')->name('purchase-payments.update');
     Route::delete('/purchase-payments/destroy/{purchasePayment}', 'PurchasePaymentsController@destroy')->name('purchase-payments.destroy');
     
-Route::post('/purchases/{id}/update-status', [PurchaseController::class, 'updateStatus'])
+    Route::post('/purchases/{id}/update-status', [PurchaseController::class, 'updateStatus'])
     ->name('purchases.updateStatus');
 
     Route::get('/purchases/{id}/print', [PurchaseController::class, 'print'])
     ->name('purchases.print');
+
+    Route::post('/purchases/{id}/approve', [PurchaseController::class, 'approve'])
+        ->name('purchases.approve');
+
+    Route::post('/purchases/{id}/reject', [PurchaseController::class, 'reject'])
+        ->name('purchases.reject');
 });
