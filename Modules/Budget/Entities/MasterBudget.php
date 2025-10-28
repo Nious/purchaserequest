@@ -22,6 +22,7 @@ class MasterBudget extends Model
         'status',
         'used_amount',
         'reserved_amount',
+        'approval_request_id',
     ];
 
         public function scopeApproved($query)
@@ -71,7 +72,8 @@ class MasterBudget extends Model
 
     public function approvalRequest()
     {
-        return $this->morphOne(\Modules\Approval\Entities\ApprovalRequest::class, 'requestable');
+        // return $this->morphOne(\Modules\Approval\Entities\ApprovalRequest::class, 'requestable');
+        return $this->belongsTo(\Modules\Approval\Entities\ApprovalRequest::class, 'approval_request_id');
     }
 
     public function isApproved()

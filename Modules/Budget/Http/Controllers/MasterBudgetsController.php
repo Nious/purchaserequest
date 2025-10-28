@@ -14,6 +14,8 @@ use Modules\Approval\Services\ApprovalEngine;
 use Illuminate\Support\Facades\Auth;
 use Modules\Approval\Entities\ApprovalType;
 use Modules\Approval\Entities\ApprovalRule;
+use Modules\Approval\Entities\ApprovalRuleLevel;
+use Modules\Approval\Entities\ApprovalRequestLog;
 
 class MasterBudgetsController extends Controller
 {
@@ -126,8 +128,21 @@ class MasterBudgetsController extends Controller
 
     public function show($id)
     {
+        // Ambil data MasterBudget
         $budget = MasterBudget::with('details', 'department')->findOrFail($id);
-        return view('budget::master_budget.show', compact('budget'));
+
+        // 2. Ambil Approval Logs sesuai alur yang Anda minta:
+        //    Mulai dari ApprovalRequestLog -> cek relasi approvalRequest -> cocokkan ID & Tipe
+        $approvalLogs = ApprovalRequestLog::with('approver') // Ambil juga data user approver
+            ->whereHas('approvalRequest', function ($query) use ($id) {
+                // Filter relasi 'approvalRequest'
+                $query->where('requestable_type', 'Master Budget') // Sesuaikan string 'Master Budget'
+                    ->where('requestable_id', $id); // Cocokkan dengan ID MasterBudget
+            })
+            ->get(); // Ambil semua log yang cocok
+
+        // 3. Kirim kedua data ke view
+        return view('budget::master_budget.show', compact('budget', 'approvalLogs'));
     }
 
     public function edit($id)
@@ -206,25 +221,148 @@ class MasterBudgetsController extends Controller
             return response()->json(['error' => 'Anda tidak punya akses untuk approve.'], 403);
         }
 
-        $budget->update(['status' => 'Approved']);
+        try {
+            DB::transaction(function () use ($budget) {
+                
+                // --- Cari Approval Request ---
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Master Budget') 
+                                                ->where('requestable_id', $budget->id)
+                                                ->first();
 
-        return response()->json(['success' => true, 'message' => 'Budget berhasil disetujui.']);
+                // Jika request-nya ada, proses
+                if ($approvalRequest) {
+                    
+                    // Update log PENGGUNA SAAT INI
+                    $log = $approvalRequest->logs()
+                        ->where('user_id', Auth::id())
+                        ->where('level', $approvalRequest->current_level)   
+                        ->where('action', 'assigned')
+                        ->first(); 
+                    
+                    if (!$log) {
+                        // Jika user tidak berhak/sudah approve, lempar error
+                        throw new \Exception('Anda tidak berwenang memproses permintaan ini di level saat ini.');
+                    }
+                    
+                    $log->update([
+                        'action'  => 'approved',
+                        'comment' => 'Approved: ' . now()->format('d-m-Y H:i:s'),
+                    ]);
+
+                    // Cek apakah level ini sudah selesai
+                    $pendingCount = $approvalRequest->logs()
+                        ->where('level', $approvalRequest->current_level)
+                        ->where('action', 'assigned')
+                        ->count();
+
+                    // Jika semua sudah approve di level ini
+                    if ($pendingCount == 0) {
+                        $nextLevelNumber = $approvalRequest->current_level + 1;
+
+                        $nextLevelData = ApprovalRuleLevel::where('approval_rules_id', $approvalRequest->approval_rules_id)
+                            ->where('level', $nextLevelNumber)
+                            ->first();
+
+                        if ($nextLevelData) {
+                            // --- MASIH ADA LEVEL BERIKUTNYA ---
+                            // Buat log untuk level berikutnya
+                            foreach ($nextLevelData->users->where('role', 'approver') as $nextUser) {
+                                $approvalRequest->logs()->create([
+                                    'level'   => $nextLevelNumber,
+                                    'user_id' => $nextUser->user_id,
+                                    'action'  => 'assigned',
+                                ]);
+                            }
+                            // Naikkan level request
+                            $approvalRequest->update(['current_level' => $nextLevelNumber]);
+                        
+                        } else {
+                            // --- JIKA INI ADALAH LEVEL TERAKHIR ---
+                            // Update status MasterBudget
+                            $budget->update(['status' => 'Approved']);
+                            // Update status ApprovalRequest
+                            $approvalRequest->update(['status' => 'approved']);
+                        }
+                    }
+                
+                } else {
+                    $budget->update(['status' => 'Approved']);
+                }
+            });
+
+            // Beri respons sukses
+            return response()->json(['success' => true, 'message' => 'Budget berhasil disetujui.']);
+            
+        } catch (\Throwable $e) {
+            // Tangkap jika ada error
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function reject(Request $request, $id)
     {
+        $request->validate([
+            'notes' => 'required|string|min:5',
+        ]);
+        
         $budget = MasterBudget::findOrFail($id);
 
-        if (! Gate::allows('approve-budget', $budget)) {
+        if (! Gate::allows('approve-budget', $budget)) { // Asumsi Gate-nya sama
             return response()->json(['error' => 'Anda tidak punya akses untuk reject.'], 403);
         }
 
-        $budget->update([
-            'status' => 'Rejected',
-            'notes' => $request->notes
-        ]);
+        try {
+            DB::transaction(function () use ($budget, $request) {
+                
+                // --- Cari Approval Request ---
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Master Budget') 
+                                                ->where('requestable_id', $budget->id)
+                                                ->first();
 
-        return response()->json(['success' => true, 'message' => 'Budget ditolak.']);
+                // Jika request-nya ada, proses
+                if ($approvalRequest) {
+                    
+                    // Update log PENGGUNA SAAT INI
+                    $log = $approvalRequest->logs()
+                        ->where('user_id', Auth::id())
+                        ->where('level', $approvalRequest->current_level)   
+                        ->where('action', 'assigned')
+                        ->first(); 
+                    
+                    if (!$log) {
+                        // Jika user tidak berhak/sudah memproses, lempar error
+                        throw new \Exception('Anda tidak berwenang memproses permintaan ini di level saat ini.');
+                    }
+                    
+                    // Update log menjadi 'rejected'
+                    $log->update([
+                        'action'  => 'rejected',
+                        'comment' => $request->notes,
+                    ]);
+
+                    // Langsung hentikan dan update semua status
+                    $budget->update([
+                        'status' => 'Rejected',
+                        'notes'  => $request->notes
+                    ]);
+                    $approvalRequest->update(['status' => 'rejected']);
+                
+                } else {
+                    // Fallback jika tidak ada Approval Request
+                    $budget->update([
+                        'status' => 'Rejected',
+                        'notes'  => $request->notes
+                    ]);
+                }
+            }); // Transaksi selesai
+
+            // Beri respons sukses
+            return response()->json(['success' => true, 'message' => 'Budget berhasil ditolak.']);
+            
+        } catch (\Throwable $e) {
+            // Tangkap jika ada error
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     public function updateStatus(Request $request, $id)
@@ -239,7 +377,7 @@ class MasterBudgetsController extends Controller
 
         // Jika rejected, simpan alasan di kolom notes
         if ($status === 'rejected') {
-            $budget->notes = $reason;
+            // $budget->notes = $reason;
         }
 
         $budget->save();

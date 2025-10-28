@@ -68,100 +68,223 @@ class PurchaseController extends Controller
     /**
      * Simpan data purchase baru.
      */
+    // public function store(StorePurchaseRequest $request)
+    // {
+    //     abort_if(Gate::denies('create_purchases'), 403);
+
+    //     DB::transaction(function () use ($request) {
+
+    //         $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
+    //         $total_amount  = (int) str_replace(['.', ','], '', $request->total_amount ?? 0);
+    //         $shipping_amount = (int) str_replace(['.', ','], '', $request->shipping_amount ?? 0);
+    //         $budget_value  = (int) str_replace(['.', ','], '', $request->master_budget_value ?? 0);
+    //         $remaining_budget = (int) str_replace(['.', ','], '', $request->master_budget_remaining ?? 0);
+
+    //         $due_amount = $total_amount - $paid_amount;
+
+    //         if ($due_amount == $total_amount) {
+    //             $payment_status = 'Unpaid';
+    //         } elseif ($due_amount > 0) {
+    //             $payment_status = 'Partial';
+    //         } else {
+    //             $payment_status = 'Paid';
+    //         }
+
+    //         $budget = MasterBudget::find($request->master_budget_id);
+
+    //         $purchase = Purchase::create([
+    //             'reference' => Purchase::generatePRNumber(),
+    //             'date' => $request->date ?? now(),
+    //             'supplier_id' => $request->supplier_id ?? null,
+    //             'users_id' => $request->users_id ?? auth()->id(),
+    //             'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
+    //             'tax_percentage' => $request->tax_percentage ?? 0,
+    //             'discount_percentage' => $request->discount_percentage ?? 0,
+    //             'shipping_amount' => $shipping_amount ?? null,
+    //             'paid_amount' => $paid_amount ?? null,
+    //             'master_budget_id' => $budget?->id,
+    //             'total_amount' => $total_amount,
+    //             'master_budget_value' => $budget_value,
+    //             'master_budget_remaining' => $remaining_budget,
+    //             'due_amount' => $due_amount ?? null,
+    //             'status' => $request->status ?? 'Pending',
+    //             'payment_status' => $payment_status ?? 'Unpaid',
+    //             'payment_method' => $request->payment_method ?? 'Cash',
+    //             'note' => $request->note ?? '',
+    //             'tax_amount' => (int) Cart::instance('purchase')->tax() ?? 0,
+    //             'discount_amount' => (int) Cart::instance('purchase')->discount() ?? 0,
+    //         ]);
+
+    //         foreach (Cart::instance('purchase')->content() as $cart_item) {
+    //             PurchaseDetail::create([
+    //                 'purchase_id' => $purchase->id,
+    //                 'product_id' => $cart_item->id,
+    //                 'product_name' => $cart_item->name,
+    //                 'product_code' => $cart_item->options->code,
+    //                 'product_unit' => $product->product_unit ?? '-',
+    //                 'quantity' => $cart_item->qty,
+    //                 'price' => (int) $cart_item->price,
+    //                 'unit_price' => (int) $cart_item->options->unit_price,
+    //                 'sub_total' => (int) $cart_item->options->sub_total,
+    //                 'product_discount_amount' => (int) $cart_item->options->product_discount,
+    //                 'product_discount_type' => $cart_item->options->product_discount_type,
+    //                 'product_tax_amount' => (int) $cart_item->options->product_tax,
+    //             ]);
+
+    //             // Jika status sudah complete, update stok produk
+    //             if ($request->status == 'Completed') {
+    //                 $product = Product::findOrFail($cart_item->id);
+    //                 $product->update([
+    //                     'product_quantity' => $product->product_quantity + $cart_item->qty
+    //                 ]);
+    //             }
+    //         }
+
+    //         // Jika ada pembayaran
+    //         if ($purchase->paid_amount > 0) {
+    //             PurchasePayment::create([
+    //                 'date' => $request->date ?? now(),
+    //                 'reference' => 'INV/' . $purchase->reference,
+    //                 'amount' => $purchase->paid_amount,
+    //                 'purchase_id' => $purchase->id,
+    //                 'payment_method' => $request->payment_method ?? 'Cash'
+    //             ]);
+    //         }
+
+    //         // Update sisa budget di tabel master_budgets
+    //         if ($budget) {
+    //             $budget->remaining_budget = $remaining_budget;
+    //             $budget->save();
+    //         }
+
+    //         Cart::instance('purchase')->destroy();
+    //     });
+
+    //     toast('Purchase Created Successfully!', 'success');
+    //     return redirect()->route('purchases.index');
+    // }
     public function store(StorePurchaseRequest $request)
     {
         abort_if(Gate::denies('create_purchases'), 403);
+        
+        // Cari Aturan (Rule) yang relevan untuk "Purchase Request"
+        $rule = ApprovalRule::whereHas('type', function ($query) {
+            $query->where('approval_name', 'Purchase Request'); // Sesuaikan nama jika perlu
+        })->where('is_active', true)->first();
 
-        DB::transaction(function () use ($request) {
+        if (!$rule) {
+            return back()->withErrors(['error' => 'Aturan Approval (Approval Rule) untuk "Purchase Request" tidak ditemukan atau belum dikonfigurasi.'])->withInput();
+        }
+        $approvalTypesId = $rule->approval_types_id;
+        // --- BATAS PERSIAPAN ---
 
-            $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
-            $total_amount  = (int) str_replace(['.', ','], '', $request->total_amount ?? 0);
-            $shipping_amount = (int) str_replace(['.', ','], '', $request->shipping_amount ?? 0);
-            $budget_value  = (int) str_replace(['.', ','], '', $request->master_budget_value ?? 0);
-            $remaining_budget = (int) str_replace(['.', ','], '', $request->master_budget_remaining ?? 0);
 
-            $due_amount = $total_amount - $paid_amount;
+        try {
+            DB::transaction(function () use ($request, $approvalTypesId) {
 
-            if ($due_amount == $total_amount) {
-                $payment_status = 'Unpaid';
-            } elseif ($due_amount > 0) {
-                $payment_status = 'Partial';
-            } else {
-                $payment_status = 'Paid';
-            }
+                $total_amount     = $request->total_amount ?? 0;
+                $budget_value     = $request->master_budget_value ?? 0;
+                $remaining_budget = $request->master_budget_remaining ?? 0;
+                $paid_amount      = $request->paid_amount ?? 0;
+                $due_amount       = $total_amount - $paid_amount;
+                $payment_status   = 'Unpaid';
+                if ($due_amount > 0 && $due_amount < $total_amount) {
+                    $payment_status = 'Partial';
+                } elseif ($due_amount <= 0) {
+                    $payment_status = 'Paid';
+                }
 
-            $budget = MasterBudget::find($request->master_budget_id);
+                // --- Cari Master Budget yang Relevan ---
+                $budget = null;
+                if ($request->department_id && $request->date) {
+                    $purchaseDate = Carbon::parse($request->date);
+                    $month = $purchaseDate->month;
+                    $year = $purchaseDate->year;
 
-            $purchase = Purchase::create([
-                'reference' => Purchase::generatePRNumber(),
-                'date' => $request->date ?? now(),
-                'supplier_id' => $request->supplier_id ?? null,
-                'users_id' => $request->users_id ?? auth()->id(),
-                'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
-                'tax_percentage' => $request->tax_percentage ?? 0,
-                'discount_percentage' => $request->discount_percentage ?? 0,
-                'shipping_amount' => $shipping_amount ?? null,
-                'paid_amount' => $paid_amount ?? null,
-                'master_budget_id' => $budget?->id,
-                'total_amount' => $total_amount,
-                'master_budget_value' => $budget_value,
-                'master_budget_remaining' => $remaining_budget,
-                'due_amount' => $due_amount ?? null,
-                'status' => $request->status ?? 'Pending',
-                'payment_status' => $payment_status ?? 'Unpaid',
-                'payment_method' => $request->payment_method ?? 'Cash',
-                'note' => $request->note ?? '',
-                'tax_amount' => (int) Cart::instance('purchase')->tax() ?? 0,
-                'discount_amount' => (int) Cart::instance('purchase')->discount() ?? 0,
-            ]);
+                    $budget = MasterBudget::where('department_id', $request->department_id)
+                                          ->where('bulan', $month)
+                                          ->whereYear('periode_awal', $year)
+                                          ->where('status', 'Approved')
+                                          ->first();
+                }
 
-            foreach (Cart::instance('purchase')->content() as $cart_item) {
-                PurchaseDetail::create([
-                    'purchase_id' => $purchase->id,
-                    'product_id' => $cart_item->id,
-                    'product_name' => $cart_item->name,
-                    'product_code' => $cart_item->options->code,
-                    'product_unit' => $product->product_unit ?? '-',
-                    'quantity' => $cart_item->qty,
-                    'price' => (int) $cart_item->price,
-                    'unit_price' => (int) $cart_item->options->unit_price,
-                    'sub_total' => (int) $cart_item->options->sub_total,
-                    'product_discount_amount' => (int) $cart_item->options->product_discount,
-                    'product_discount_type' => $cart_item->options->product_discount_type,
-                    'product_tax_amount' => (int) $cart_item->options->product_tax,
+                // --- Buat Purchase Record ---
+                $purchase = Purchase::create([
+                    'reference'        => Purchase::generatePRNumber(),
+                    'date'             => $request->date ?? now(),
+                    'supplier_id'      => $request->supplier_id ?? null,
+                    'users_id'         => $request->users_id ?? auth()->id(),
+                    'department_id'    => $request->department_id ?? optional(auth()->user())->department_id,
+                    'master_budget_id' => $budget?->id,
+                    'total_amount'     => $total_amount,
+                    'master_budget_value' => $budget_value,
+                    'master_budget_remaining' => $remaining_budget,
+                    'due_amount'       => $due_amount,
+                    'status'           => 'Pending', // Status awal
+                    'payment_status'   => $payment_status,
+                    'note'             => $request->note ?? '',
+                    'tax_percentage'        => $request->tax_percentage ?? 0,
+                    'discount_percentage'   => $request->discount_percentage ?? 0,
+                    'shipping_amount'       => $request->shipping_amount ?? 0,
+                    'payment_method'        => $request->payment_method ?? 'Cash',
+                    'tax_amount'            => Cart::instance('purchase')->tax() ?? 0,
+                    'discount_amount'       => Cart::instance('purchase')->discount() ?? 0,
                 ]);
 
-                // Jika status sudah complete, update stok produk
-                if ($request->status == 'Completed') {
-                    $product = Product::findOrFail($cart_item->id);
-                    $product->update([
-                        'product_quantity' => $product->product_quantity + $cart_item->qty
+                // --- Simpan Purchase Details ---
+                foreach (Cart::instance('purchase')->content() as $cart_item) {
+                    PurchaseDetail::create([
+                        'purchase_id'             => $purchase->id,
+                        'product_id'              => $cart_item->id,
+                        'product_name'            => $cart_item->name,
+                        'product_code'            => $cart_item->options->code,
+                        'product_unit'            => $cart_item->options->unit ?? '-', // ✅ PERBAIKAN BUG
+                        'quantity'                => $cart_item->qty,
+                        'price'                   => $cart_item->price,
+                        'unit_price'              => $cart_item->options->unit_price,
+                        'sub_total'               => $cart_item->options->sub_total,
+                        'product_discount_amount' => $cart_item->options->product_discount ?? 0,
+                        'product_discount_type'   => $cart_item->options->product_discount_type ?? 'fixed',
+                        'product_tax_amount'      => $cart_item->options->product_tax ?? 0,
                     ]);
                 }
-            }
+                
+                // --- Update Master Budget (Reserved Amount) ---
+                if ($budget) {
+                    // Tambahkan total PR ke 'reserved' atau 'used'
+                    // Ini adalah pendekatan "budget ter-reservasi"
+                    $budget->reserved_amount += $total_amount; 
+                    $budget->save();
+                }
+                
+                // --- 🔗 Integrasi Approval ---
+                $approvalRequest = $this->approvalEngine->createRequest(
+                    'Purchase Request',     // String (pastikan ada di Morph Map)
+                    $purchase->id,
+                    $approvalTypesId,
+                    $purchase->total_amount,
+                    Auth::id()
+                );
 
-            // Jika ada pembayaran
-            if ($purchase->paid_amount > 0) {
-                PurchasePayment::create([
-                    'date' => $request->date ?? now(),
-                    'reference' => 'INV/' . $purchase->reference,
-                    'amount' => $purchase->paid_amount,
-                    'purchase_id' => $purchase->id,
-                    'payment_method' => $request->payment_method ?? 'Cash'
-                ]);
-            }
+                // --- Sinkronisasi Status ---
+                if ($purchase->status !== ucfirst($approvalRequest->status)) {
+                    $purchase->update(['status' => ucfirst($approvalRequest->status)]); 
+                }
+                
+                // (Opsional) Simpan ID approval request
+                // $purchase->update(['approval_request_id' => $approvalRequest->id]);
 
-            // Update sisa budget di tabel master_budgets
-            if ($budget) {
-                $budget->remaining_budget = $remaining_budget;
-                $budget->save();
-            }
+                // --- Hancurkan Cart ---
+                Cart::instance('purchase')->destroy();
+            }); // Transaksi Selesai
 
-            Cart::instance('purchase')->destroy();
-        });
+            toast('Purchase Request Created Successfully!', 'success');
+            return redirect()->route('purchases.index');
 
-        toast('Purchase Created Successfully!', 'success');
-        return redirect()->route('purchases.index');
+        } catch (\Throwable $e) {
+            // Jika ada error di mana pun, rollback dan tampilkan pesan
+            return back()->withErrors(['error' => 'Gagal membuat Purchase Request: ' . $e->getMessage()])->withInput();
+        }
     }
 
     /**

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ApprovalRequest extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
 
     protected $table = 'approval_requests';
 
@@ -17,7 +17,6 @@ class ApprovalRequest extends Model
         'requestable_type',
         'approval_rules_id',
         'requestable_id',
-        'requested_by',
         'amount',
         'status',
         'current_level',
@@ -44,8 +43,8 @@ class ApprovalRequest extends Model
         return $this->hasMany(ApprovalRequestLog::class);
     }
 
-    public function requester()
+    public function creator() // Nama diubah agar lebih jelas
     {
-        return $this->belongsTo(\App\Models\User::class, 'requested_by');
+        return $this->belongsTo(\App\Models\User::class, 'created_by');
     }
 }

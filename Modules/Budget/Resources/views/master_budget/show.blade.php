@@ -41,6 +41,48 @@
 
             </div>
         </div>
+        <div class="card-header">
+            <h5 class="mb-2 fw-bold text-secondary">Log Approval</h5>
+            
+            {{-- Jika tidak ada log sama sekali --}}
+            @if($approvalLogs->isEmpty())
+                <h6 class="text-muted my-0">Belum ada riwayat approval.</h6>
+            @endif
+        
+            {{-- Loop untuk log yang SUDAH DISETUJUI --}}
+            @foreach($approvalLogs->where('action', 'approved') as $log)
+                <div class_content="d-flex justify-content-between align-items-center">
+                    <h6 class="text-success my-0">
+                        <i class="bi bi-check-circle-fill"></i>
+                        Disetujui oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                    </h6>
+                    @if($log->comment)
+                        <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
+                    @endif
+                </div>
+            @endforeach
+        
+            {{-- Loop untuk log yang MASIH MENUNGGU --}}
+            @foreach($approvalLogs->where('action', 'assigned') as $log)
+                 <h6 class="text-warning my-0">
+                    <i class="bi bi-hourglass-split"></i>
+                    Menunggu approval dari: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                 </h6>
+            @endforeach
+        
+            {{-- Loop untuk log yang DITOLAK --}}
+            @foreach($approvalLogs->where('action', 'rejected') as $log)
+                 <div class_content="d-flex justify-content-between align-items-center">
+                     <h6 class="text-danger my-0">
+                        <i class="bi bi-x-circle-fill"></i>
+                        Ditolak oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                     </h6>
+                     @if($log->comment)
+                        <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
+                     @endif
+                 </div>
+            @endforeach
+        </div>
 
         <div class="card-body">
             {{-- Informasi Budget --}}
@@ -161,9 +203,66 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         });
-    });
-
-   
+    });   
 });
+
+function submitApproval(status, reason = null) {
+    let url = "";
+    let data = {
+        _token: "{{ csrf_token() }}", // Token keamanan Laravel
+        status: status
+    };
+
+    // 1. Tentukan URL Controller mana yang akan dituju
+    if (status === 'approved') {
+        url = "{{ route('master_budget.approve', $budget->id) }}";
+    } else if (status === 'rejected') {
+        url = "{{ route('master_budget.reject', $budget->id) }}";
+        // Tambahkan 'notes' ke data jika statusnya 'rejected'
+        data.notes = reason; 
+    }
+
+    if (url === "") return; // Jangan lakukan apa-apa jika status tidak dikenal
+
+    // 2. Kirim data ke server menggunakan Fetch (AJAX)
+    fetch(url, {
+        method: "POST",
+        headers: {
+            "X-CSRF-TOKEN": "{{ csrf_token() }}",
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        },
+        body: JSON.stringify(data) // Ubah data JavaScript menjadi string JSON
+    })
+    .then(response => {
+        // Cek jika server merespon dengan error (seperti 403, 404, 500)
+        if (!response.ok) {
+            // Ambil pesan error dari JSON server jika ada
+            return response.json().then(err => { throw new Error(err.error || 'Terjadi kesalahan.') });
+        }
+        return response.json(); // Ubah respons server menjadi JSON
+    })
+    .then(data => {
+        // 3. Tampilkan pesan berdasarkan respons dari Controller
+        if (data.success) {
+            // Jika Controller mengembalikan { success: true, message: '...' }
+            Swal.fire({
+                title: 'Berhasil!',
+                text: data.message, // Tampilkan pesan sukses dari server
+                icon: 'success'
+            }).then(() => {
+                location.reload(); // Muat ulang halaman untuk melihat status baru
+            });
+        } else {
+            // Jika Controller mengembalikan { success: false, error: '...' }
+            Swal.fire('Gagal!', data.error || 'Terjadi kesalahan saat memproses.', 'error');
+        }
+    })
+    .catch(error => {
+        // 4. Tampilkan pesan jika koneksi gagal
+        console.error('Fetch Error:', error);
+        Swal.fire('Error!', error.message || 'Tidak dapat terhubung ke server.', 'error');
+    });
+}
 </script>
 @endpush
