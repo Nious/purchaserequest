@@ -63,7 +63,7 @@ class ApprovalEngine
             // Jika pembuat (requester) tidak ditemukan di dalam aturan approval
             if (!$requesterRule) {
                 // Batalkan transaksi dan lempar error, karena tidak ada alur approval yang cocok
-                throw new \Exception("Alur approval tidak ditemukan untuk requester ini di level {$startingLevel->level}.");
+                throw new \Exception("Alur approval tidak ditemukan untuk requester ini di level {$startingLevel->level}. Silahkan Hubungi Administrator Untuk Menambahkan Approval Rules.");
             }
 
             // Ambil sequence dari requester yang ditemukan
@@ -77,7 +77,7 @@ class ApprovalEngine
 
             // Jika tidak ada approver yang cocok di sequence ini
             if ($approvers->isEmpty()) {
-                throw new \Exception("Tidak ada approver yang ditemukan untuk requester ini di sequence {$targetSequence}, level {$startingLevel->level}.");
+                throw new \Exception("Tidak ada approver yang ditemukan untuk requester ini di sequence {$targetSequence}, level {$startingLevel->level}. Silahkan Hubungi Administrator Untuk Menambahkan Approval Rules.");
             }
 
             // Buat log tugas untuk approver yang ditemukan

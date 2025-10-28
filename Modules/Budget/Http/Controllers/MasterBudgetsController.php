@@ -16,6 +16,7 @@ use Modules\Approval\Entities\ApprovalType;
 use Modules\Approval\Entities\ApprovalRule;
 use Modules\Approval\Entities\ApprovalRuleLevel;
 use Modules\Approval\Entities\ApprovalRequestLog;
+use Modules\Approval\Entities\ApprovalRuleUser;
 
 class MasterBudgetsController extends Controller
 {
@@ -71,59 +72,63 @@ class MasterBudgetsController extends Controller
     $nextNumber = $lastBudget ? (int) str_replace('BDGT', '', $lastBudget->no_budgeting) + 1 : 1;
     $noBudgeting = 'BDGT' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
 
-    DB::transaction(function () use ($request, $noBudgeting, $approvalTypesId) {
+    try {
+        DB::transaction(function () use ($request, $noBudgeting, $approvalTypesId) {
 
-        // Pastikan nilai grandtotal numerik (hapus format "Rp" atau koma)
-        $grandtotal = preg_replace('/[^0-9.]/', '', $request->grandtotal);
-
-        $master = MasterBudget::create([
-            'no_budgeting'    => $noBudgeting,
-            'tgl_penyusunan'  => $request->tgl_penyusunan,
-            'bulan'           => $request->bulan,
-            'periode_awal'    => $request->periode_awal,
-            'periode_akhir'   => $request->periode_akhir,
-            'department_id'   => $request->department_id,
-            'description'     => $request->description,
-            'grandtotal'      => (float) $grandtotal,
-            'status'          => 'Pending',
-            'used_amount'     => 0,
-            'reserved_amount' => 0,
-        ]);
-
-        // Simpan detail
-        if ($request->filled('items')) {
-            foreach ($request->items as $item) {
-                BudgetDetail::create([
-                    'master_budget_id' => $master->id,
-                    'category_id'      => $item['category_id'] ?? null,
-                    'category_name'    => $item['category_name'] ?? null,
-                    'budget'           => (float) preg_replace('/[^0-9.]/', '', $item['budget'] ?? 0),
-                ]);
-            }
-        }
-        
-        // 🔗 Integrasi Approval
-        $approval = $this->approvalEngine->createRequest( // Gunakan $this->approvalEngine
-            'Master Budget',
-            $master->id,
-            $approvalTypesId,
-            $master->grandtotal,
-            auth()->id()
-        );
-
-        // (Opsional) Update status MasterBudget sesuai hasil dari engine
-        if ($master->status !== $approval->status) {
-            $master->update(['status' => $approval->status]);
-        }
-
-        $master->update(['approval_request_id' => $approval->id]);
-    });
-
+            // Pastikan nilai grandtotal numerik (hapus format "Rp" atau koma)
+            $grandtotal = preg_replace('/[^0-9.]/', '', $request->grandtotal);
     
-
-    return redirect()
-        ->route('master_budget.index')
-        ->with('success', 'Budget berhasil disimpan.');
+            $master = MasterBudget::create([
+                'no_budgeting'    => $noBudgeting,
+                'tgl_penyusunan'  => $request->tgl_penyusunan,
+                'bulan'           => $request->bulan,
+                'periode_awal'    => $request->periode_awal,
+                'periode_akhir'   => $request->periode_akhir,
+                'department_id'   => $request->department_id,
+                'description'     => $request->description,
+                'grandtotal'      => (float) $grandtotal,
+                'status'          => 'Pending',
+                'used_amount'     => 0,
+                'reserved_amount' => 0,
+            ]);
+    
+            // Simpan detail
+            if ($request->filled('items')) {
+                foreach ($request->items as $item) {
+                    BudgetDetail::create([
+                        'master_budget_id' => $master->id,
+                        'category_id'      => $item['category_id'] ?? null,
+                        'category_name'    => $item['category_name'] ?? null,
+                        'budget'           => (float) preg_replace('/[^0-9.]/', '', $item['budget'] ?? 0),
+                    ]);
+                }
+            }
+            
+            // 🔗 Integrasi Approval
+            $approval = $this->approvalEngine->createRequest( // Gunakan $this->approvalEngine
+                'Master Budget',
+                $master->id,
+                $approvalTypesId,
+                $master->grandtotal,
+                auth()->id()
+            );
+    
+            // (Opsional) Update status MasterBudget sesuai hasil dari engine
+            if ($master->status !== $approval->status) {
+                $master->update(['status' => $approval->status]);
+            }
+    
+            $master->update(['approval_request_id' => $approval->id]);
+        });
+    
+        return redirect()
+            ->route('master_budget.index')
+            ->with('success', 'Budget berhasil disimpan.');
+    }catch (\Throwable $e) { // <-- BLOK CATCH AKAN MENANGKAP ERROR
+        
+        // Kirim pengguna kembali ke form dengan pesan error
+        return back()->withErrors(['error' => $e->getMessage()])->withInput();
+    }
 }
 
     public function show($id)
@@ -263,20 +268,50 @@ class MasterBudgetsController extends Controller
                             ->where('level', $nextLevelNumber)
                             ->first();
 
-                        if ($nextLevelData) {
-                            // --- MASIH ADA LEVEL BERIKUTNYA ---
-                            // Buat log untuk level berikutnya
-                            foreach ($nextLevelData->users->where('role', 'approver') as $nextUser) {
-                                $approvalRequest->logs()->create([
-                                    'level'   => $nextLevelNumber,
-                                    'user_id' => $nextUser->user_id,
-                                    'action'  => 'assigned',
-                                ]);
-                            }
-                            // Naikkan level request
-                            $approvalRequest->update(['current_level' => $nextLevelNumber]);
-                        
-                        } else {
+                            if ($nextLevelData) {
+                                // --- MASIH ADA LEVEL BERIKUTNYA ---
+                                
+                                // 1. Dapatkan ID user pembuat request
+                                $requesterId = $approvalRequest->created_by;
+                            
+                                // 2. Temukan data 'requester' di level BERIKUTNYA
+                                $requesterRule = ApprovalRuleUser::where('approval_rule_levels_id', $nextLevelData->id)
+                                                     ->where('role', 'requester')
+                                                     ->where('user_id', $requesterId)
+                                                     ->first();
+                            
+                                // --- INI PERUBAHANNYA ---
+                                if (!$requesterRule) {
+                                    // Jika requester tidak ditemukan di alur level 2,
+                                    // anggap alur selesai (SAMA SEPERTI TIDAK ADA LEVEL BERIKUTNYA).
+                                    $budget->update(['status' => 'Approved']);
+                                    $approvalRequest->update(['status' => 'approved']);
+                                
+                                } else {
+                                    // --- JIKA REQUESTER DITEMUKAN, LANJUTKAN ALUR SEQUENCE ---
+                                    $targetSequence = $requesterRule->sequence;
+                            
+                                    $approvers = ApprovalRuleUser::where('approval_rule_levels_id', $nextLevelData->id)
+                                                               ->where('role', 'approver')
+                                                               ->where('sequence', $targetSequence)
+                                                               ->get();
+                            
+                                    if ($approvers->isEmpty()) {
+                                        throw new \Exception("Tidak ada approver yang ditemukan untuk sequence {$targetSequence} di level {$nextLevelNumber}.");
+                                    }
+                            
+                                    foreach ($approvers as $nextUser) {
+                                        $approvalRequest->logs()->create([
+                                            'level'   => $nextLevelNumber,
+                                            'user_id' => $nextUser->user_id,
+                                            'action'  => 'assigned',
+                                        ]);
+                                    }
+                                    
+                                    $approvalRequest->update(['current_level' => $nextLevelNumber]);
+                                }
+                            
+                            } else {
                             // --- JIKA INI ADALAH LEVEL TERAKHIR ---
                             // Update status MasterBudget
                             $budget->update(['status' => 'Approved']);

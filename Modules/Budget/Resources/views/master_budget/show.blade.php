@@ -190,7 +190,13 @@ document.addEventListener('DOMContentLoaded', function () {
                             confirmButtonText: 'Kirim',
                             cancelButtonText: 'Batal',
                             inputValidator: (value) => {
-                                if (!value) return 'Alasan tidak boleh kosong!';
+                                if (value.trim().length < 5) {
+                                    return 'Alasan harus berisi minimal 5 karakter.';
+                                }
+                                if (!value || value.trim().length === 0) {
+                                    return 'Alasan tidak boleh kosong!';
+                                }
+                                return null;
                             }
                         }).then((reasonResult) => {
                             if (reasonResult.isConfirmed) {

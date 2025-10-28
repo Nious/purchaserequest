@@ -3,6 +3,7 @@
 namespace Modules\Purchase\Http\Controllers;
 
 use Illuminate\Routing\Controller;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Gloudemans\Shoppingcart\Facades\Cart;
@@ -17,9 +18,22 @@ use Modules\People\Entities\Supplier;
 use Modules\Budget\Entities\MasterBudget;
 use Modules\Department\Entities\Department;
 use Carbon\Carbon;
+use Modules\Approval\Services\ApprovalEngine;
+use Illuminate\Support\Facades\Auth;
+use Modules\Approval\Entities\ApprovalRule;
+use Modules\Approval\Entities\ApprovalRequest;
+use Modules\Approval\Entities\ApprovalRuleLevel;
+use Modules\Approval\Entities\ApprovalRequestLog;
 
 class PurchaseController extends Controller
 {
+    // protected $approvalEngine;
+
+    // public function __construct(ApprovalEngine $approvalEngine)
+    // {
+    //     $this->approvalEngine = $approvalEngine;
+    // }
+
     /**
      * Menampilkan daftar pembelian.
      */
@@ -35,7 +49,7 @@ class PurchaseController extends Controller
      */
     public function create()
     {
-        abort_if(Gate::denies('create_purchases'), 403);
+        // abort_if(Gate::denies('create_purchases'), 403);
 
         Cart::instance('purchase')->destroy();
 
@@ -65,136 +79,211 @@ class PurchaseController extends Controller
 
         return response()->json(['success' => true, 'status' => $purchase->status]);
     }
+
+    public function approve($id)
+    {
+        $purchase = Purchase::findOrFail($id);
+
+        // 1. Cek otorisasi (sesuaikan nama Gate Anda)
+        if (! Gate::allows('approve_purchases', $purchase)) {
+            return response()->json(['error' => 'Anda tidak punya akses untuk approve.'], 403);
+        }
+
+        try {
+            // 2. Gunakan Transaksi Database
+            DB::transaction(function () use ($purchase) {
+                
+                // --- Cari Approval Request ---
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Purchase Request') // <-- GANTI STRING
+                                                  ->where('requestable_id', $purchase->id)
+                                                  ->first();
+
+                // 3. Jika request-nya ada, proses
+                if ($approvalRequest) {
+                    
+                    // 3a. Update log PENGGUNA SAAT INI
+                    $log = $approvalRequest->logs()
+                        ->where('user_id', Auth::id())
+                        ->where('level', $approvalRequest->current_level)   
+                        ->where('action', 'assigned')
+                        ->first(); 
+                    
+                    if (!$log) {
+                        throw new \Exception('Anda tidak berwenang memproses permintaan ini di level saat ini.');
+                    }
+                    
+                    $log->update([
+                        'action'  => 'approved',
+                        'comment' => 'Approved: ' . now()->format('d-m-Y H:i:s'),
+                    ]);
+
+                    // 3b. Cek apakah level ini sudah selesai
+                    $pendingCount = $approvalRequest->logs()
+                        ->where('level', $approvalRequest->current_level)
+                        ->where('action', 'assigned')
+                        ->count();
+
+                    // 3c. Jika semua sudah approve di level ini
+                    if ($pendingCount == 0) {
+                        $nextLevelNumber = $approvalRequest->current_level + 1;
+
+                        $nextLevelData = ApprovalRuleLevel::where('approval_rules_id', $approvalRequest->approval_rules_id)
+                            ->where('level', $nextLevelNumber)
+                            ->first();
+
+                        if ($nextLevelData) {
+                            // --- MASIH ADA LEVEL BERIKUTNYA ---
+                            foreach ($nextLevelData->users->where('role', 'approver') as $nextUser) {
+                                $approvalRequest->logs()->create([
+                                    'level'   => $nextLevelNumber,
+                                    'user_id' => $nextUser->user_id,
+                                    'action'  => 'assigned',
+                                ]);
+                            }
+                            $approvalRequest->update(['current_level' => $nextLevelNumber]);
+                        
+                        } else {
+                            // --- INI ADALAH LEVEL TERAKHIR ---
+                            $purchase->update(['status' => 'Approved']);
+                            $approvalRequest->update(['status' => 'approved']);
+                            
+                            // --- (OPSIONAL) UPDATE BUDGET SETELAH APPROVE ---
+                            // Jika 'reserved_amount' digunakan, ubah menjadi 'used_amount'
+                            if ($purchase->master_budget_id) {
+                                $budget = MasterBudget::find($purchase->master_budget_id);
+                                if ($budget) {
+                                    $budget->reserved_amount -= $purchase->total_amount;
+                                    $budget->used_amount += $purchase->total_amount;
+                                    $budget->save();
+                                }
+                            }
+                        }
+                    }
+                
+                } else {
+                    // Fallback jika tidak ada Approval Request
+                    $purchase->update(['status' => 'Approved']);
+                }
+            }); // Transaksi selesai
+
+            // 4. Beri respons sukses
+            return response()->json(['success' => true, 'message' => 'Purchase Request berhasil disetujui.']);
+            
+        } catch (\Throwable $e) {
+            // Tangkap jika ada error
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Menolak Purchase Request.
+     */
+    public function reject(Request $request, $id)
+    {
+        $request->validate([
+            'notes' => 'required|string|min:5',
+        ]);
+        
+        $purchase = Purchase::findOrFail($id);
+
+        // 1. Cek otorisasi (sesuaikan nama Gate Anda)
+        if (! Gate::allows('approve_purchases', $purchase)) {
+            return response()->json(['error' => 'Anda tidak punya akses untuk reject.'], 403);
+        }
+
+        try {
+            DB::transaction(function () use ($purchase, $request) {
+                
+                // --- Cari Approval Request ---
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Purchase Request') // <-- GANTI STRING
+                                                  ->where('requestable_id', $purchase->id)
+                                                  ->first();
+
+                if ($approvalRequest) {
+                    
+                    $log = $approvalRequest->logs()
+                        ->where('user_id', Auth::id())
+                        ->where('level', $approvalRequest->current_level)   
+                        ->where('action', 'assigned')
+                        ->first(); 
+                    
+                    if (!$log) {
+                        throw new \Exception('Anda tidak berwenang memproses permintaan ini di level saat ini.');
+                    }
+                    
+                    $log->update([
+                        'action'  => 'rejected',
+                        'comment' => $request->notes,
+                    ]);
+
+                    // --- Langsung hentikan dan update semua status ---
+                    $purchase->update([
+                        'status' => 'rejected',
+                        'note'   => $request->notes
+                    ]);
+                    $approvalRequest->update(['status' => 'rejected']);
+                    
+                    // --- KEMBALIKAN BUDGET YANG DI-RESERVE ---
+                    if ($purchase->master_budget_id) {
+                        $budget = MasterBudget::find($purchase->master_budget_id);
+                        if ($budget) {
+                            $budget->reserved_amount -= $purchase->total_amount;
+                            $budget->save();
+                        }
+                    }
+                
+                } else {
+                    // Fallback jika tidak ada Approval Request
+                    $purchase->update([
+                        'status' => 'rejected',
+                        'note'   => $request->notes
+                    ]);
+                }
+            }); // Transaksi selesai
+
+            return response()->json(['success' => true, 'message' => 'Purchase Request berhasil ditolak.']);
+            
+        } catch (\Throwable $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Simpan data purchase baru.
      */
-    // public function store(StorePurchaseRequest $request)
-    // {
-    //     abort_if(Gate::denies('create_purchases'), 403);
-
-    //     DB::transaction(function () use ($request) {
-
-    //         $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
-    //         $total_amount  = (int) str_replace(['.', ','], '', $request->total_amount ?? 0);
-    //         $shipping_amount = (int) str_replace(['.', ','], '', $request->shipping_amount ?? 0);
-    //         $budget_value  = (int) str_replace(['.', ','], '', $request->master_budget_value ?? 0);
-    //         $remaining_budget = (int) str_replace(['.', ','], '', $request->master_budget_remaining ?? 0);
-
-    //         $due_amount = $total_amount - $paid_amount;
-
-    //         if ($due_amount == $total_amount) {
-    //             $payment_status = 'Unpaid';
-    //         } elseif ($due_amount > 0) {
-    //             $payment_status = 'Partial';
-    //         } else {
-    //             $payment_status = 'Paid';
-    //         }
-
-    //         $budget = MasterBudget::find($request->master_budget_id);
-
-    //         $purchase = Purchase::create([
-    //             'reference' => Purchase::generatePRNumber(),
-    //             'date' => $request->date ?? now(),
-    //             'supplier_id' => $request->supplier_id ?? null,
-    //             'users_id' => $request->users_id ?? auth()->id(),
-    //             'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
-    //             'tax_percentage' => $request->tax_percentage ?? 0,
-    //             'discount_percentage' => $request->discount_percentage ?? 0,
-    //             'shipping_amount' => $shipping_amount ?? null,
-    //             'paid_amount' => $paid_amount ?? null,
-    //             'master_budget_id' => $budget?->id,
-    //             'total_amount' => $total_amount,
-    //             'master_budget_value' => $budget_value,
-    //             'master_budget_remaining' => $remaining_budget,
-    //             'due_amount' => $due_amount ?? null,
-    //             'status' => $request->status ?? 'Pending',
-    //             'payment_status' => $payment_status ?? 'Unpaid',
-    //             'payment_method' => $request->payment_method ?? 'Cash',
-    //             'note' => $request->note ?? '',
-    //             'tax_amount' => (int) Cart::instance('purchase')->tax() ?? 0,
-    //             'discount_amount' => (int) Cart::instance('purchase')->discount() ?? 0,
-    //         ]);
-
-    //         foreach (Cart::instance('purchase')->content() as $cart_item) {
-    //             PurchaseDetail::create([
-    //                 'purchase_id' => $purchase->id,
-    //                 'product_id' => $cart_item->id,
-    //                 'product_name' => $cart_item->name,
-    //                 'product_code' => $cart_item->options->code,
-    //                 'product_unit' => $product->product_unit ?? '-',
-    //                 'quantity' => $cart_item->qty,
-    //                 'price' => (int) $cart_item->price,
-    //                 'unit_price' => (int) $cart_item->options->unit_price,
-    //                 'sub_total' => (int) $cart_item->options->sub_total,
-    //                 'product_discount_amount' => (int) $cart_item->options->product_discount,
-    //                 'product_discount_type' => $cart_item->options->product_discount_type,
-    //                 'product_tax_amount' => (int) $cart_item->options->product_tax,
-    //             ]);
-
-    //             // Jika status sudah complete, update stok produk
-    //             if ($request->status == 'Completed') {
-    //                 $product = Product::findOrFail($cart_item->id);
-    //                 $product->update([
-    //                     'product_quantity' => $product->product_quantity + $cart_item->qty
-    //                 ]);
-    //             }
-    //         }
-
-    //         // Jika ada pembayaran
-    //         if ($purchase->paid_amount > 0) {
-    //             PurchasePayment::create([
-    //                 'date' => $request->date ?? now(),
-    //                 'reference' => 'INV/' . $purchase->reference,
-    //                 'amount' => $purchase->paid_amount,
-    //                 'purchase_id' => $purchase->id,
-    //                 'payment_method' => $request->payment_method ?? 'Cash'
-    //             ]);
-    //         }
-
-    //         // Update sisa budget di tabel master_budgets
-    //         if ($budget) {
-    //             $budget->remaining_budget = $remaining_budget;
-    //             $budget->save();
-    //         }
-
-    //         Cart::instance('purchase')->destroy();
-    //     });
-
-    //     toast('Purchase Created Successfully!', 'success');
-    //     return redirect()->route('purchases.index');
-    // }
     public function store(StorePurchaseRequest $request)
     {
+        // Cek Gate Anda
         abort_if(Gate::denies('create_purchases'), 403);
         
-        // Cari Aturan (Rule) yang relevan untuk "Purchase Request"
-        $rule = ApprovalRule::whereHas('type', function ($query) {
-            $query->where('approval_name', 'Purchase Request'); // Sesuaikan nama jika perlu
-        })->where('is_active', true)->first();
-
-        if (!$rule) {
-            return back()->withErrors(['error' => 'Aturan Approval (Approval Rule) untuk "Purchase Request" tidak ditemukan atau belum dikonfigurasi.'])->withInput();
-        }
-        $approvalTypesId = $rule->approval_types_id;
-        // --- BATAS PERSIAPAN ---
-
-
         try {
-            DB::transaction(function () use ($request, $approvalTypesId) {
+
+            $rule = ApprovalRule::whereHas('type', function ($query) {
+                $query->where('approval_name', 'Purchase Request'); // Sesuaikan nama jika perlu
+            })->where('is_active', true)->first();
+
+            if (!$rule) {
+                throw new \Exception('Aturan Approval (Approval Rule) untuk "Purchase Request" tidak ditemukan.');
+            }
+            $approvalTypesId = $rule->approval_types_id;
+            
+            $approvalEngine = app(ApprovalEngine::class);
+
+            $purchase = DB::transaction(function () use ($request, $approvalTypesId, $approvalEngine) {
 
                 $total_amount     = $request->total_amount ?? 0;
                 $budget_value     = $request->master_budget_value ?? 0;
                 $remaining_budget = $request->master_budget_remaining ?? 0;
                 $paid_amount      = $request->paid_amount ?? 0;
                 $due_amount       = $total_amount - $paid_amount;
-                $payment_status   = 'Unpaid';
+                
+                $payment_status = 'Unpaid';
                 if ($due_amount > 0 && $due_amount < $total_amount) {
                     $payment_status = 'Partial';
                 } elseif ($due_amount <= 0) {
                     $payment_status = 'Paid';
                 }
 
-                // --- Cari Master Budget yang Relevan ---
                 $budget = null;
                 if ($request->department_id && $request->date) {
                     $purchaseDate = Carbon::parse($request->date);
@@ -202,20 +291,19 @@ class PurchaseController extends Controller
                     $year = $purchaseDate->year;
 
                     $budget = MasterBudget::where('department_id', $request->department_id)
-                                          ->where('bulan', $month)
-                                          ->whereYear('periode_awal', $year)
-                                          ->where('status', 'Approved')
-                                          ->first();
+                                        ->where('bulan', $month)
+                                        ->whereYear('periode_awal', $year)
+                                        ->where('status', 'Approved') // Pastikan 'Approved'
+                                        ->first();
                 }
 
-                // --- Buat Purchase Record ---
-                $purchase = Purchase::create([
+                $newPurchase = Purchase::create([
                     'reference'        => Purchase::generatePRNumber(),
                     'date'             => $request->date ?? now(),
                     'supplier_id'      => $request->supplier_id ?? null,
                     'users_id'         => $request->users_id ?? auth()->id(),
                     'department_id'    => $request->department_id ?? optional(auth()->user())->department_id,
-                    'master_budget_id' => $budget?->id,
+                    'master_budget_id' => $budget?->id, // Ambil ID dari budget yang ditemukan
                     'total_amount'     => $total_amount,
                     'master_budget_value' => $budget_value,
                     'master_budget_remaining' => $remaining_budget,
@@ -231,10 +319,9 @@ class PurchaseController extends Controller
                     'discount_amount'       => Cart::instance('purchase')->discount() ?? 0,
                 ]);
 
-                // --- Simpan Purchase Details ---
                 foreach (Cart::instance('purchase')->content() as $cart_item) {
                     PurchaseDetail::create([
-                        'purchase_id'             => $purchase->id,
+                        'purchase_id'             => $newPurchase->id,
                         'product_id'              => $cart_item->id,
                         'product_name'            => $cart_item->name,
                         'product_code'            => $cart_item->options->code,
@@ -249,40 +336,33 @@ class PurchaseController extends Controller
                     ]);
                 }
                 
-                // --- Update Master Budget (Reserved Amount) ---
                 if ($budget) {
-                    // Tambahkan total PR ke 'reserved' atau 'used'
-                    // Ini adalah pendekatan "budget ter-reservasi"
                     $budget->reserved_amount += $total_amount; 
                     $budget->save();
                 }
-                
-                // --- 🔗 Integrasi Approval ---
-                $approvalRequest = $this->approvalEngine->createRequest(
-                    'Purchase Request',     // String (pastikan ada di Morph Map)
-                    $purchase->id,
+
+                $approvalRequest = $approvalEngine->createRequest( // <-- Gunakan variabel $approvalEngine
+                    'Purchase Request',   
+                    $newPurchase->id,      
                     $approvalTypesId,
-                    $purchase->total_amount,
+                    $newPurchase->total_amount,
                     Auth::id()
                 );
 
                 // --- Sinkronisasi Status ---
-                if ($purchase->status !== ucfirst($approvalRequest->status)) {
-                    $purchase->update(['status' => ucfirst($approvalRequest->status)]); 
+                if ($newPurchase->status !== ucfirst($approvalRequest->status)) {
+                    $newPurchase->update(['status' => ucfirst($approvalRequest->status)]); 
                 }
                 
-                // (Opsional) Simpan ID approval request
-                // $purchase->update(['approval_request_id' => $approvalRequest->id]);
-
-                // --- Hancurkan Cart ---
                 Cart::instance('purchase')->destroy();
-            }); // Transaksi Selesai
+                
+                return $newPurchase;
+            }); 
 
             toast('Purchase Request Created Successfully!', 'success');
             return redirect()->route('purchases.index');
 
         } catch (\Throwable $e) {
-            // Jika ada error di mana pun, rollback dan tampilkan pesan
             return back()->withErrors(['error' => 'Gagal membuat Purchase Request: ' . $e->getMessage()])->withInput();
         }
     }
@@ -430,11 +510,20 @@ class PurchaseController extends Controller
         }
         // --- BATAS TAMBAHAN ---
 
+        $approvalLogs = ApprovalRequestLog::with('approver') // Ambil juga data user approver
+            ->whereHas('approvalRequest', function ($query) use ($id) {
+                // Filter relasi 'approvalRequest'
+                $query->where('requestable_type', 'Purchase Request') // Sesuaikan string 'Master Budget'
+                    ->where('requestable_id', $id); // Cocokkan dengan ID MasterBudget
+            })
+            ->get();
+
         // Kirim data budget terkini ke view
         return view('purchase::show', compact(
             'purchase', 
             'currentRemainingBudget', 
-            'sisaBudgetSetelahPRIni'
+            'sisaBudgetSetelahPRIni',
+            'approvalLogs'
         ));
     }
 
