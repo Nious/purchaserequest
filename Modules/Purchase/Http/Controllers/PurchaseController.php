@@ -24,6 +24,7 @@ use Modules\Approval\Entities\ApprovalRule;
 use Modules\Approval\Entities\ApprovalRequest;
 use Modules\Approval\Entities\ApprovalRuleLevel;
 use Modules\Approval\Entities\ApprovalRequestLog;
+use Modules\Approval\Entities\ApprovalRuleUser;
 
 class PurchaseController extends Controller
 {
@@ -132,27 +133,69 @@ class PurchaseController extends Controller
                             ->first();
 
                         if ($nextLevelData) {
-                            // --- MASIH ADA LEVEL BERIKUTNYA ---
-                            foreach ($nextLevelData->users->where('role', 'approver') as $nextUser) {
-                                $approvalRequest->logs()->create([
-                                    'level'   => $nextLevelNumber,
-                                    'user_id' => $nextUser->user_id,
-                                    'action'  => 'assigned',
-                                ]);
+                            // --- MASIH ADA LEVEL BERIKUTNYA (LOGIKA BARU) ---
+                            
+                            // 1. Dapatkan ID user pembuat request
+                            $requesterId = $approvalRequest->created_by;
+
+                            // 2. Temukan data 'requester' di level BERIKUTNYA
+                            $requesterRule = ApprovalRuleUser::where('approval_rule_levels_id', $nextLevelData->id)
+                                                ->where('role', 'requester')
+                                                ->where('user_id', $requesterId)
+                                                ->first();
+
+                            // 3. Cek jika requester ditemukan di alur level 2
+                            if (!$requesterRule) {
+                                // Jika requester tidak ditemukan, anggap alur selesai
+                                $purchase->update(['status' => 'Approved']);
+                                $approvalRequest->update(['status' => 'approved']);
+                                // ... (Tambahkan logika update budget di sini juga)
+                                if ($purchase->master_budget_id) {
+                                    $budget = MasterBudget::find($purchase->master_budget_id);
+                                    if ($budget) {
+                                        // $budget->reserved_amount -= $purchase->total_amount; // Hati-hati double-counting jika pakai 'reserved'
+                                        $budget->used_amount += $purchase->total_amount;
+                                        $budget->save();
+                                    }
+                                }
+                            
+                            } else {
+                                // --- JIKA REQUESTER DITEMUKAN, LANJUTKAN ALUR SEQUENCE ---
+                                $targetSequence = $requesterRule->sequence;
+
+                                $approvers = ApprovalRuleUser::where('approval_rule_levels_id', $nextLevelData->id)
+                                                        ->where('role', 'approver')
+                                                        ->where('sequence', $targetSequence)
+                                                        ->get();
+
+                                if ($approvers->isEmpty()) {
+                                    throw new \Exception("Tidak ada approver yang ditemukan untuk sequence {$targetSequence} di level {$nextLevelNumber}.");
+                                }
+
+                                // Buat log tugas hanya untuk approver yang ditemukan
+                                foreach ($approvers as $nextUser) {
+                                    $approvalRequest->logs()->create([
+                                        'level'   => $nextLevelNumber,
+                                        'user_id' => $nextUser->user_id,
+                                        'action'  => 'assigned',
+                                    ]);
+                                }
+                                
+                                // Naikkan level request
+                                $approvalRequest->update(['current_level' => $nextLevelNumber]);
                             }
-                            $approvalRequest->update(['current_level' => $nextLevelNumber]);
-                        
+                            // --- BATAS PERUBAHAN ---
+
                         } else {
-                            // --- INI ADALAH LEVEL TERAKHIR ---
+                            // --- INI ADALAH LEVEL TERAKHIR (TIDAK ADA $nextLevelData) ---
                             $purchase->update(['status' => 'Approved']);
                             $approvalRequest->update(['status' => 'approved']);
                             
                             // --- (OPSIONAL) UPDATE BUDGET SETELAH APPROVE ---
-                            // Jika 'reserved_amount' digunakan, ubah menjadi 'used_amount'
                             if ($purchase->master_budget_id) {
                                 $budget = MasterBudget::find($purchase->master_budget_id);
                                 if ($budget) {
-                                    $budget->reserved_amount -= $purchase->total_amount;
+                                    // $budget->reserved_amount -= $purchase->total_amount;
                                     $budget->used_amount += $purchase->total_amount;
                                     $budget->save();
                                 }
@@ -227,7 +270,7 @@ class PurchaseController extends Controller
                     if ($purchase->master_budget_id) {
                         $budget = MasterBudget::find($purchase->master_budget_id);
                         if ($budget) {
-                            $budget->reserved_amount -= $purchase->total_amount;
+                            // $budget->reserved_amount -= $purchase->total_amount;
                             $budget->save();
                         }
                     }
@@ -337,7 +380,7 @@ class PurchaseController extends Controller
                 }
                 
                 if ($budget) {
-                    $budget->reserved_amount += $total_amount; 
+                    // $budget->reserved_amount += $total_amount; 
                     $budget->save();
                 }
 
