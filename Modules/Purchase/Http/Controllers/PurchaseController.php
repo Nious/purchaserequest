@@ -577,9 +577,54 @@ class PurchaseController extends Controller
     {
         abort_if(Gate::denies('delete_purchases'), 403);
 
-        $purchase->delete();
+        try {
+            DB::transaction(function () use ($purchase) {
+                
+                if ($purchase->master_budget_id && !in_array($purchase->status, ['rejected', 'cancelled'])) {
+                    
+                    $budget = MasterBudget::find($purchase->master_budget_id);
 
-        toast('Purchase Deleted!', 'warning');
-        return redirect()->route('purchases.index');
+                    if ($budget) {
+                        if ($purchase->status == 'pending') {
+                            // Jika 'Pending', uang masih di 'reserved'. Kembalikan dari 'reserved'.
+                            // $budget->reserved_amount -= $purchase->total_amount;
+                        } elseif ($purchase->status == 'approved' || $purchase->status == 'Completed') {
+                            // Jika 'Approved', uang sudah di 'used'. Kembalikan dari 'used'.
+                            $budget->used_amount -= $purchase->total_amount;
+                        }
+                        
+                        // Pastikan tidak menjadi negatif
+                        // if($budget->reserved_amount < 0) $budget->reserved_amount = 0;
+                        if($budget->used_amount < 0) $budget->used_amount = 0;
+                        
+                        $budget->save();
+                    }
+                }
+
+                // --- 2. HAPUS APPROVAL REQUEST TERKAIT ---
+                // Cari request yang terhubung dengan PR ini
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Purchase Request') // <-- Sesuaikan string ini
+                                                  ->where('requestable_id', $purchase->id)
+                                                  ->first();
+                
+                if ($approvalRequest) {
+                    // Hapus log-nya dulu
+                    $approvalRequest->logs()->delete();
+                    // Hapus request utamanya
+                    $approvalRequest->delete(); 
+                }
+
+                // --- 3. HAPUS PURCHASE (DAN DETAILNYA) ---
+                $purchase->delete(); // Ini akan otomatis menghapus purchase_details (jika relasi di model di-set cascade)
+            
+            }); // Transaksi selesai
+
+            toast('Purchase Deleted!', 'warning');
+            return redirect()->route('purchases.index');
+
+        } catch (\Throwable $e) {
+            // Jika ada error, rollback dan tampilkan pesan
+            return back()->withErrors(['error' => 'Gagal menghapus Purchase Request: ' . $e->getMessage()]);
+        }
     }
 }
