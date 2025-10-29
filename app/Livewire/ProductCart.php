@@ -134,12 +134,12 @@ class ProductCart extends Component
         // Tambahkan shipping
         $this->grand_total = $total_after_discount + ($this->shipping ?? 0);
 
+        $purchaseDateObj = Carbon::parse($this->purchase_date);
+        $month = $purchaseDateObj->month;
+        $year = $purchaseDateObj->year;
+
         // Ambil budget berdasarkan department dan bulan saat ini
         if ($this->department_id) {
-            $purchaseDateObj = Carbon::parse($this->purchase_date);
-            $month = $purchaseDateObj->month;
-            $year = $purchaseDateObj->year;
-        
             // Query pertama untuk menjumlahkan grandtotal
             $totalGrandtotal = MasterBudget::where('department_id', $this->department_id)
                 ->where('bulan', $month)
@@ -166,6 +166,17 @@ class ProductCart extends Component
 
         $this->sisa_budget = $this->budget - $this->grand_total;
 
+        $nonDeptBudgetResult = MasterBudget::where('department_id', 0)
+            ->where('bulan', $month)
+            ->whereYear('periode_awal', $year)
+            ->where('status', 'approved')
+            ->selectRaw('SUM(grandtotal) as total, SUM(used_amount) as used, SUM(reserved_amount) as reserved')
+            ->first();
+
+        // Hitung sisa budget non-departemen
+        $non_dept_budget_remaining = ($nonDeptBudgetResult->total ?? 0) - ($nonDeptBudgetResult->used ?? 0) - ($nonDeptBudgetResult->reserved ?? 0);
+        $over_budget_min_sisa_budget = $non_dept_budget_remaining + $this->sisa_budget;
+
         // Update budget di database jika ada
         // if ($this->budget_id) {
         //     MasterBudget::where('id', $this->budget_id)
@@ -181,6 +192,8 @@ class ProductCart extends Component
             'total_amount' => $this->grand_total,
             'master_budget_value' => $this->budget,
             'master_budget_remaining' => $this->sisa_budget,
+            'non_dept_budget_remaining' => $non_dept_budget_remaining,
+            'over_budget_min_sisa_budget' => $over_budget_min_sisa_budget
         ]);
 
     }

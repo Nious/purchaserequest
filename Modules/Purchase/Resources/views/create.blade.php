@@ -129,12 +129,7 @@
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
-document.addEventListener('livewire:init', () => {
-    Livewire.on('update-budget-fields', (data) => {
-        const payload = Array.isArray(data) ? data[0] : data;
-        console.log('Data diterima dari Livewire:', payload);
-
-        const formatRupiah = (angka) => {
+const formatRupiah = (angka) => {
             let num = Number(angka);
             if (isNaN(num)) num = 0;
             return num.toLocaleString('id-ID', { 
@@ -144,6 +139,14 @@ document.addEventListener('livewire:init', () => {
                 maximumFractionDigits: 0
             });
         };
+
+let globalNonDeptBudgetRemaining = 0;
+let globalOverBudgetMinSisaBudget = 0;
+
+document.addEventListener('livewire:init', () => {
+    Livewire.on('update-budget-fields', (data) => {
+        const payload = Array.isArray(data) ? data[0] : data;
+        console.log('Data diterima dari Livewire:', payload);
 
         const grandTotalEl = document.getElementById('grand_total_display');
         const budgetEl = document.getElementById('budget_display');
@@ -164,6 +167,8 @@ document.addEventListener('livewire:init', () => {
         document.getElementById('master_budget_value').value = budget;
         document.getElementById('master_budget_remaining').value = remaining;
 
+        globalNonDeptBudgetRemaining = Number(payload.non_dept_budget_remaining) || 0;
+        globalOverBudgetMinSisaBudget = Number(payload.over_budget_min_sisa_budget) || 0;
     });
     
 });
@@ -198,18 +203,70 @@ document.addEventListener('DOMContentLoaded', function () {
                 confirmButtonText: 'Mengerti',
                 confirmButtonColor: '#d33',
             });
-            return; // Hentikan proses
+            return;
         }
         // Jika melebihi budget
         if (remaining < 0) {
+            const nonDeptBudgetFormatted = formatRupiah(globalNonDeptBudgetRemaining);
+            const remainingRp = formatRupiah(remaining);
+            const overBudgetKurang = remaining + globalNonDeptBudgetRemaining;
+            const overBudgetKurangRp = formatRupiah(overBudgetKurang);
+            
             Swal.fire({
-                title: 'Budget Melebihi Batas!',
-                text: 'Total permintaan melebihi budget yang tersedia. Silakan kurangi item atau hubungi departemen terkait.',
-                icon: 'error',
-                confirmButtonText: 'Mengerti',
-                confirmButtonColor: '#d33',
+                title: 'Budget Departemen Habis!',
+                text: `Total PR melebihi budget departemen ${remainingRp}. Sisa Over Budget Saat Ini: ${nonDeptBudgetFormatted}. Tetap lanjutkan?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Lanjut Cek',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+            }).then((result) => {
+                // Jika user klik 'Ya, Lanjut Cek'
+                if (result.isConfirmed) {
+
+                    // Cek apakah dana Over Budget (non-dept) JUGA tidak cukup
+                    if (overBudgetKurang < 0) {
+                        Swal.fire({
+                            title: 'Dana Over Budget Melebihi Batas!',
+                            text: `Anda Tidak Bisa Melakukan Pengajuan. Total sisa dana (Dept + Over Budget) masih kurang: ${overBudgetKurangRp}`,
+                            icon: 'error',
+                            confirmButtonText: 'Mengerti',
+                            confirmButtonColor: '#d33',
+                        });
+                        return;
+
+                    // Jika dana Over Budget CUKUP
+                    } else {
+                        Swal.fire({
+                            title: 'Buat PR Over Budget?',
+                            text: 'Dana departemen tidak cukup, tapi akan ditutupi oleh dana Over Budget. Yakin kirim PR ini?',
+                            icon: 'question',
+                            showCancelButton: true,
+                            confirmButtonText: 'Ya, Kirim',
+                            cancelButtonText: 'Batal',
+                            reverseButtons: true,
+                            confirmButtonColor: '#3085d6',
+                            cancelButtonColor: '#d33',
+                        }).then((resultOverBudget) => {
+                            if (resultOverBudget.isConfirmed) {
+                                // Tambahkan input hidden untuk penanda over-budget
+                                // Ini akan dibaca oleh Controller di method store()
+                                const overBudgetInput = document.createElement('input');
+                                overBudgetInput.type = 'hidden';
+                                overBudgetInput.name = 'is_over_budget'; 
+                                overBudgetInput.value = '1';
+                                form.appendChild(overBudgetInput);
+                                
+                                // Submit form
+                                form.submit(); 
+                            }
+                        });
+                    }
+                }
+                // Jika "Batal", tidak terjadi apa-apa
             });
-            // Tidak memanggil form.submit() berarti proses berhenti di sini
         }
         // Jika masih dalam budget
         else {
