@@ -39,6 +39,10 @@
             <div class="col-md-3">
                 <label>Departemen</label>
                 <select name="department_id" class="form-control">
+                    {{-- Opsi default --}}
+                    <option value="0" {{ old('department_id') == 0 ? 'selected' : '' }}>All Department</option>
+            
+                    {{-- Opsi departemen dari database --}}
                     @foreach($departments as $dept)
                         <option value="{{ $dept->id }}" {{ old('department_id') == $dept->id ? 'selected' : '' }}>
                             {{ $dept->department_name }}

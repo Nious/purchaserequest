@@ -51,7 +51,15 @@ class MasterBudgetsController extends Controller
         'bulan'          => 'required',
         'periode_awal'   => 'required|date',
         'periode_akhir'  => 'required|date',
-        'department_id'  => 'required|exists:departments,id',
+        'department_id' => [
+            'required',
+            'integer',
+            function ($attribute, $value, $fail) {
+                if ($value != 0 && !\DB::table('departments')->where('id', $value)->exists()) {
+                    $fail('Departemen tidak valid.');
+                }
+            },
+        ],
         'grandtotal'     => 'required',
         'description'    => 'nullable|string',
     ]);

@@ -110,7 +110,15 @@
                 </tr>
                 <tr>
                     <th>Departemen</th>
-                    <td>{{ $budget->department ? $budget->department->department_name : '-' }}</td>
+                    <td>
+                        @if ($budget->department_id === 0)
+                            All Departement
+                        @elseif ($budget->department)
+                            {{ $budget->department->department_name }}
+                        @else
+                            -
+                        @endif
+                    </td>
                 </tr>
                 <tr>
                     <th>Description</th>

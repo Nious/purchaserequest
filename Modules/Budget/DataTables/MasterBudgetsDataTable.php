@@ -22,7 +22,13 @@ class MasterBudgetsDataTable extends DataTable
                 return $data->bulan_text; // pakai accessor
             })
             ->addColumn('department_name', function ($data) {
-                return $data->department ? $data->department->department_name : '-';
+                if ($data->department_id === 0) {
+                    return 'All Departement';
+                } elseif ($data->department) {
+                    return $data->department->department_name;
+                } else {
+                    return '-';
+                }
             })
             ->addColumn('used_budget', function ($data) {
                 return $data->used_amount_formatted;
