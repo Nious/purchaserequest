@@ -3,11 +3,13 @@
 <a href="{{ route('master_budget.edit', $data->id) }}" class="btn btn-sm btn-warning">Edit</a>
 @endif
 
+@if(strtolower($data->status) !== 'approved')
 <form action="{{ route('master_budget.destroy', $data->id) }}" method="POST" style="display:inline;">
     @csrf
     @method('DELETE')
     <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Yakin hapus?')">Hapus</button>
 </form>
+@endif
 
 @if($data->approval_status === 'Pending' && Gate::allows('approve-budget', $data))
     <form action="{{ route('master_budget.approve', $data->id) }}" method="POST" style="display:inline;">

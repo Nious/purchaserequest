@@ -28,6 +28,7 @@
             </a>
         @endcan
         @can('delete_purchases')
+        @if($data->status != 'approved')
             <button id="delete" class="dropdown-item" onclick="
                 event.preventDefault();
                 if (confirm('Are you sure? It will delete the data permanently!')) {
@@ -39,6 +40,7 @@
                     @method('delete')
                 </form>
             </button>
+            @endif
         @endcan
     </div>
 </div>
