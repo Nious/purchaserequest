@@ -795,80 +795,238 @@ class PurchaseController extends Controller
     /**
      * Update Purchase.
      */
+
+    // public function update(UpdatePurchaseRequest $request, Purchase $purchase)
+    // {
+    //     abort_if(Gate::denies('edit_purchases'), 403);
+
+    //     DB::transaction(function () use ($request, $purchase) {
+
+    //         $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
+    //         $total_amount  = (int) str_replace(['.', ','], '', $request->total_amount ?? 0);
+    //         $shipping_amount = (int) str_replace(['.', ','], '', $request->shipping_amount ?? 0);
+    //         $budget_value  = (int) str_replace(['.', ','], '', $request->master_budget_value ?? 0);
+    //         $remaining_budget = (int) str_replace(['.', ','], '', $request->master_budget_remaining ?? 0);
+
+    //         $due_amount = $total_amount - $paid_amount;
+
+    //         if ($due_amount == $total_amount) {
+    //             $payment_status = 'Unpaid';
+    //         } elseif ($due_amount > 0) {
+    //             $payment_status = 'Partial';
+    //         } else {
+    //             $payment_status = 'Paid';
+    //         }
+
+    //         $budget = MasterBudget::find($request->master_budget_id);
+
+    //         // Hapus detail lama
+    //         foreach ($purchase->purchaseDetails as $detail) {
+    //             if ($purchase->status == 'Completed') {
+    //                 $product = Product::findOrFail($detail->product_id);
+    //                 $product->update([
+    //                     'product_quantity' => $product->product_quantity - $detail->quantity
+    //                 ]);
+    //             }
+    //             $detail->delete();
+    //         }
+
+    //         $purchase->update([
+    //             'date' => $request->date ?? now(),
+    //             'supplier_id' => $request->supplier_id ?? null,
+    //             'users_id' => $request->users_id ?? auth()->id(),
+    //             'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
+    //             'master_budget_id' => $budget?->id,
+    //             'total_amount' => $total_amount,
+    //             'master_budget_value' => $budget_value,
+    //             'master_budget_remaining' => $remaining_budget,
+    //             'due_amount' => $due_amount ?? 0,
+    //             'status' => $request->status ?? 'Pending',
+    //             'payment_status' => $payment_status,
+    //             'note' => $request->note ?? '',
+    //         ]);
+
+    //         foreach (Cart::instance('purchase')->content() as $cart_item) {
+    //             PurchaseDetail::create([
+    //                 'purchase_id' => $purchase->id,
+    //                 'product_id' => $cart_item->id,
+    //                 'product_name' => $cart_item->name,
+    //                 'product_code' => $cart_item->options->code,
+    //                 'product_unit' => $product->product_unit ?? '-',
+    //                 'quantity' => $cart_item->qty,
+    //                 'price' => (int) $cart_item->price,
+    //                 'unit_price' => (int) $cart_item->options->unit_price,
+    //                 'sub_total' => (int) $cart_item->options->sub_total,
+    //                 'product_discount_amount' => (int) $cart_item->options->product_discount,
+    //                 'product_discount_type' => $cart_item->options->product_discount_type,
+    //                 'product_tax_amount' => (int) $cart_item->options->product_tax,
+    //             ]);
+    //         }
+
+    //         if ($budget) {
+    //             $budget->remaining_budget = $remaining_budget;
+    //             $budget->save();
+    //         }
+
+    //         Cart::instance('purchase')->destroy();
+    //     });
+
+    //     toast('Purchase Updated!', 'info');
+    //     return redirect()->route('purchases.index');
+    // }
+
     public function update(UpdatePurchaseRequest $request, Purchase $purchase)
     {
         abort_if(Gate::denies('edit_purchases'), 403);
 
-        DB::transaction(function () use ($request, $purchase) {
+        // Hanya izinkan update jika status masih 'Pending' atau 'Rejected'
+        if (!in_array($purchase->status, ['pending', 'rejected'])) {
+             return redirect()->route('purchases.show', $purchase->id)
+                         ->withErrors(['error' => 'Hanya PR dengan status Pending atau Rejected yang bisa diupdate.']);
+        }
 
-            $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
-            $total_amount  = (int) str_replace(['.', ','], '', $request->total_amount ?? 0);
-            $shipping_amount = (int) str_replace(['.', ','], '', $request->shipping_amount ?? 0);
-            $budget_value  = (int) str_replace(['.', ','], '', $request->master_budget_value ?? 0);
-            $remaining_budget = (int) str_replace(['.', ','], '', $request->master_budget_remaining ?? 0);
+        try {
+            // Ambil Engine secara manual
+            $approvalEngine = app(ApprovalEngine::class);
 
-            $due_amount = $total_amount - $paid_amount;
+            DB::transaction(function () use ($request, $purchase, $approvalEngine) {
 
-            if ($due_amount == $total_amount) {
-                $payment_status = 'Unpaid';
-            } elseif ($due_amount > 0) {
-                $payment_status = 'Partial';
-            } else {
-                $payment_status = 'Paid';
-            }
+                // --- 1. Persiapan Data ---
+                $total_amount     = $request->total_amount ?? 0;
+                $budget_value     = $request->master_budget_value ?? 0;
+                $remaining_budget = $request->master_budget_remaining ?? 0; // Sisa budget (bisa negatif)
+                $old_total_amount = $purchase->total_amount;
+                $old_budget_id    = $purchase->master_budget_id;
+                $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
 
-            $budget = MasterBudget::find($request->master_budget_id);
+                $due_amount = $total_amount - $paid_amount;
 
-            // Hapus detail lama
-            foreach ($purchase->purchaseDetails as $detail) {
-                if ($purchase->status == 'Completed') {
-                    $product = Product::findOrFail($detail->product_id);
-                    $product->update([
-                        'product_quantity' => $product->product_quantity - $detail->quantity
+                if ($due_amount == $total_amount) {
+                    $payment_status = 'Unpaid';
+                } elseif ($due_amount > 0) {
+                    $payment_status = 'Partial';
+                } else {
+                    $payment_status = 'Paid';
+                }
+
+                // --- 2. Update Master Budget (Kembalikan & Reserve Baru) ---
+                
+                // Kembalikan amount LAMA dari budget LAMA
+                if ($old_budget_id) {
+                    $oldBudget = MasterBudget::find($old_budget_id);
+                    if ($oldBudget) {
+                        // Asumsi 'Pending' menggunakan 'reserved_amount'
+                        $oldBudget->reserved_amount -= $old_total_amount; 
+                        $oldBudget->save();
+                    }
+                }
+
+                // Cari budget BARU
+                $newBudget = null;
+                if ($request->department_id && $request->date) {
+                    $purchaseDate = Carbon::parse($request->date);
+                    $newBudget = MasterBudget::where('department_id', $request->department_id)
+                                          ->where('bulan', $purchaseDate->month)
+                                          ->whereYear('periode_awal', $purchaseDate->year)
+                                          ->where('status', 'Approved')
+                                          ->first();
+                }
+
+                // Ambil (Reserve) amount BARU dari budget BARU
+                if ($newBudget) {
+                    $newBudget->reserved_amount += $total_amount;
+                    $newBudget->save();
+                }
+                // --- Batas Logika Budget ---
+
+
+                // --- 3. Hapus Detail Lama & Update Purchase ---
+                $purchase->purchaseDetails()->delete(); // Hapus detail lama
+
+                $purchase->update([
+                    'date' => $request->date ?? now(),
+                    'supplier_id' => $request->supplier_id ?? null,
+                    'users_id' => $request->users_id ?? auth()->id(),
+                    'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
+                    'master_budget_id' => $newBudget?->id, // Set ID budget baru
+                    'total_amount' => $total_amount,
+                    'master_budget_value' => $budget_value,
+                    'master_budget_remaining' => $remaining_budget,
+                    'due_amount' => $due_amount ?? 0,
+                    'status' => 'pending',
+                    'payment_status' => $payment_status,
+                    'note' => $request->note ?? '',
+                ]);
+
+                // --- 4. Buat Ulang Detail ---
+                foreach (Cart::instance('purchase')->content() as $cart_item) {
+                    PurchaseDetail::create([
+                        'purchase_id' => $purchase->id,
+                        'product_id' => $cart_item->id,
+                        'product_name' => $cart_item->name,
+                        'product_code' => $cart_item->options->code,
+                        'product_unit' => $cart_item->options->unit ?? '-', // Ambil dari options
+                        'quantity' => $cart_item->qty,
+                        'price' => (int) $cart_item->price,
+                        'unit_price' => (int) $cart_item->options->unit_price,
+                        'sub_total' => (int) $cart_item->options->sub_total,
+                        'product_discount_amount' => $cart_item->options->product_discount,
+                        'product_discount_type' => $cart_item->options->product_discount_type,
+                        'product_tax_amount' => (int) ($cart_item->options->product_tax ?? 0),
                     ]);
                 }
-                $detail->delete();
-            }
 
-            $purchase->update([
-                'date' => $request->date ?? now(),
-                'supplier_id' => $request->supplier_id ?? null,
-                'users_id' => $request->users_id ?? auth()->id(),
-                'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
-                'master_budget_id' => $budget?->id,
-                'total_amount' => $total_amount,
-                'master_budget_value' => $budget_value,
-                'master_budget_remaining' => $remaining_budget,
-                'due_amount' => $due_amount ?? 0,
-                'status' => $request->status ?? 'Pending',
-                'payment_status' => $payment_status,
-                'note' => $request->note ?? '',
-            ]);
+                // --- 5. Hapus Approval Request Lama ---
+                // Cari SEMUA request lama (Normal atau Over Budget) dan hapus
+                ApprovalRequest::where('requestable_id', $purchase->id)
+                    ->whereIn('requestable_type', ['Purchase Request', 'Over Budget']) // Sesuaikan string
+                    ->delete(); // Ini juga akan menghapus logs jika relasi DB di-set cascade
 
-            foreach (Cart::instance('purchase')->content() as $cart_item) {
-                PurchaseDetail::create([
-                    'purchase_id' => $purchase->id,
-                    'product_id' => $cart_item->id,
-                    'product_name' => $cart_item->name,
-                    'product_code' => $cart_item->options->code,
-                    'product_unit' => $product->product_unit ?? '-',
-                    'quantity' => $cart_item->qty,
-                    'price' => (int) $cart_item->price,
-                    'unit_price' => (int) $cart_item->options->unit_price,
-                    'sub_total' => (int) $cart_item->options->sub_total,
-                    'product_discount_amount' => (int) $cart_item->options->product_discount,
-                    'product_discount_type' => $cart_item->options->product_discount_type,
-                    'product_tax_amount' => (int) $cart_item->options->product_tax,
-                ]);
-            }
 
-            if ($budget) {
-                $budget->remaining_budget = $remaining_budget;
-                $budget->save();
-            }
+                // --- 6. Tentukan Alur Approval Baru & Buat Request ---
+                $ruleName = '';
+                $requestableType = '';
 
-            Cart::instance('purchase')->destroy();
-        });
+                if ($remaining_budget < 0) {
+                    // === ALUR OVER BUDGET ===
+                    $ruleName = 'Over Budget'; // Sesuaikan dengan nama di tabel approval_types
+                    $requestableType = 'Over Budget';
+                } else {
+                    // === ALUR NORMAL ===
+                    $ruleName = 'Purchase Request'; // Sesuaikan nama
+                    $requestableType = 'Purchase Request';
+                }
+
+                // Cari rule berdasarkan nama yang ditentukan
+                $rule = ApprovalRule::whereHas('type', function ($query) use ($ruleName) {
+                    $query->where('approval_name', $ruleName);
+                })->where('is_active', true)->first();
+
+                if (!$rule) {
+                    throw new \Exception("Aturan Approval (Approval Rule) untuk '{$ruleName}' tidak ditemukan.");
+                }
+                $approvalTypesId = $rule->approval_types_id;
+                
+                // Buat approval request baru
+                $approvalRequest = $approvalEngine->createRequest(
+                    $requestableType,
+                    $purchase->id,
+                    $approvalTypesId,
+                    $purchase->total_amount,
+                    Auth::id()
+                );
+
+                // Sinkronisasi Status
+                if ($purchase->status !== ucfirst($approvalRequest->status)) {
+                    $purchase->update(['status' => ucfirst($approvalRequest->status)]); 
+                }
+
+                Cart::instance('purchase')->destroy();
+            }); // Transaksi Selesai
+
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => 'Gagal mengupdate Purchase Request: ' . $e->getMessage()])->withInput();
+        }
 
         toast('Purchase Updated!', 'info');
         return redirect()->route('purchases.index');

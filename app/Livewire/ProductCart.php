@@ -224,6 +224,7 @@ class ProductCart extends Component
                 'stock'                 => $product['product_quantity'] ?? 0,
                 'unit'                  => $product['product_unit'] ?? '-',
                 'unit_price'            => $calc['unit_price'],
+                'product_tax'           => $calc['product_tax'] ?? 0,
                 'date'                  => now()->format('Y-m-d'),
             ]
         ]);
@@ -264,6 +265,7 @@ class ProductCart extends Component
                 'unit_price'            => $cart_item->options->unit_price,
                 'product_discount'      => $cart_item->options->product_discount,
                 'product_discount_type' => $cart_item->options->product_discount_type,
+                'product_tax'           => $cart_item->options->product_tax ?? 0,
                 'date'                  => $cart_item->options->date,
             ]
         ]);
