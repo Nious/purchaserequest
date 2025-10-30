@@ -455,6 +455,31 @@ class MasterBudgetsController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function pending(Request $request) // <-- Tambahkan Request
+    {
+        // (Opsional) Amankan halaman ini
+        // abort_if(Gate::denies('access_pending_budgets'), 403); 
 
+        // 1. Ambil status dari URL, default-nya adalah 'pending'
+        $activeStatus = $request->query('status', 'pending');
+
+        // 2. Mulai query, muat relasi
+        $query = MasterBudget::with(['department', 'approvalRequest.logs.approver']);
+
+        // 3. Terapkan filter JIKA status bukan 'all'
+        if ($activeStatus !== 'all') {
+            // Gunakan ucfirst() untuk mengubah 'pending' -> 'Pending'
+            $query->where('status', ucfirst($activeStatus)); 
+        }
+        
+        // 4. Ambil data
+        $allBudgets = $query->orderBy('tgl_penyusunan', 'desc')->get(); // Ubah ke 'desc' agar data terbaru di atas
+            
+        // 5. Kirim data DAN status aktif ke view
+        return view('budget::master_budget.pending', [
+            'pendingBudgets' => $allBudgets, // Kirim data yang sudah difilter
+            'activeStatus'   => $activeStatus  // Kirim nama status yang sedang aktif
+        ]);
+    }
 
 }
