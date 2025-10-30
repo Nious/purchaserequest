@@ -14,11 +14,20 @@
 <div class="container-fluid mb-4">
     <div class="card shadow-sm border-0">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-secondary">Detail Purchase Request</h5>
+            <h5 class="mb-0 fw-bold text-secondary">
+                Detail Purchase Request
+                
+                {{-- Cek jika $approvalRequest ada DAN tipenya 'Over Budget' --}}
+                @if(isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget')
+                    <span class="badge bg-danger ms-2">Over Budget</span>
+                @endif
+            </h5>
             <div>
-                <a href="{{ route('purchases.edit', $purchase->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
-                    <i class="bi bi-pencil-square"></i> Edit
-                </a>
+                @if ($purchase->status === 'pending')
+                    <a href="{{ route('purchases.edit', $purchase->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
+                        <i class="bi bi-pencil-square"></i> Edit
+                    </a>
+                @endif
 
                 {{-- Status Dropdown --}}
                 <div class="btn-group">
@@ -190,9 +199,10 @@
                 <div class="card-body table-responsive">
                     <h5 class="fw-bold mb-3 text-dark">Budget Summary</h5>
 
-                    {{-- Tentukan status untuk pengecekan --}}
                     @php 
                         $status = strtolower($purchase->status); 
+                        // Cek apakah request ini TIPE-nya Over Budget
+                        $isOverBudget = isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget';
                     @endphp
 
                     <table class="table table-striped">
@@ -202,11 +212,61 @@
                             <td class="text-end fw-bold">{{ format_currency($purchase->total_amount) }}</td>
                         </tr>
 
-                        @if ($status === 'pending')
-                            {{-- 
-                                JIKA MASIH PENDING: 
-                                Tampilkan perhitungan 'live' dari Controller
-                            --}}
+                        @if ($isOverBudget)
+                            {{-- =================================== --}}
+                            {{-- == TAMPILAN KHUSUS UNTUK OVER BUDGET == --}}
+                            {{-- =================================== --}}
+                            
+                            @php
+                                // Ambil snapshot budget departemen (misal: 1.800.000)
+                                $budgetDeptTersedia = $purchase->master_budget_value ?? 0; 
+                                
+                                // Ambil nilai over budget (misal: -250.000)
+                                $overageAmount = $purchase->master_budget_remaining ?? 0;
+                                $sisaMB = $saldoOverBudget - abs($overageAmount);
+                                
+                                // Hitung sisa budget departemen (misal: 0)
+                                // Rumus: 1.800.000 - (2.050.000 - 250.000) = 0
+                                $sisaBudgetDept = $budgetDeptTersedia - ($purchase->total_amount - abs($overageAmount));
+                            @endphp
+
+                            <tr>
+                                <th class="text-start text-muted">Budget {{ optional($purchase->department)->department_name ?? '-' }} (Tersedia)</th>
+                                <td class="text-end fw-bold">
+                                    {{ format_currency($budgetDeptTersedia) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-start text-muted">Sisa Budget {{ optional($purchase->department)->department_name ?? '-' }}</th>
+                                <td class="text-end fw-bold">
+                                    {{ format_currency($sisaBudgetDept) }} {{-- Harusnya 0 --}}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-start text-muted">Over Budget (Diajukan)</th>
+                                <td class="text-end fw-bold text-danger">
+                                    {{ format_currency(abs($overageAmount)) }}
+                                </td>
+                            </tr>
+                            @if ($purchase->status === 'pending')
+                            <tr>
+                                <th class="text-start text-muted">Saldo Over Budget (Saat Ini)</th>
+                                <td class="text-end fw-bold" style="color: {{ $saldoOverBudget < 0 ? 'red' : 'green' }}">
+                                    {{ format_currency($saldoOverBudget) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-start text-muted">Sisa Over Budget</th>
+                                <td class="text-end fw-bold">
+                                    {{ format_currency($sisaMB) }}
+                                </td>
+                            </tr>
+                            @endif
+
+                        @elseif ($status === 'pending')
+                            {{-- =================================== --}}
+                            {{-- == TAMPILAN UNTUK PENDING (NORMAL) == --}}
+                            {{-- =================================== --}}
                             
                             @php $remainingAfterThisPR = $sisaBudgetSetelahPRIni; @endphp 
 
@@ -222,11 +282,9 @@
                             </tr>
 
                         @else
-                            {{-- 
-                                JIKA SUDAH APPROVED ATAU REJECTED:
-                                Tampilkan data 'snapshot' yang tersimpan di database purchase
-                            --}}
-
+                            {{-- ============================================ --}}
+                            {{-- == TAMPILAN FINAL (APPROVED/REJECTED NORMAL) == --}}
+                            {{-- ============================================ --}}
                             <tr>
                                 <th class="text-start text-muted">Budget Tersedia (Saat Diproses)</th>
                                 <td class="text-end fw-bold">

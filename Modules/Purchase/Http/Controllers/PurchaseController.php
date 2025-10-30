@@ -998,36 +998,63 @@ class PurchaseController extends Controller
     {
         $purchase = Purchase::with(['purchaseDetails.product', 'department', 'user'])->findOrFail($id);
 
-        $currentRemainingBudget = 0;
+        // --- Inisialisasi Variabel ---
+        $currentRemainingBudget = 0; // Ini akan menjadi Total Alokasi Budget Dept
+        $sisaBudgetSetelahPRIni = 0; // Ini akan menjadi Sisa Budget Dept Saat Ini
+        $sisaOverBudget = 0;         // Ini akan menjadi Sisa Budget Non-Dept
+        $purchaseDateObj = null;
+        $month = null;
+        $year = null;
 
+        // --- Ambil Approval Request (Dibutuhkan untuk cek tipe) ---
+        $approvalRequest = ApprovalRequest::where('requestable_id', $id)
+            ->whereIn('requestable_type', ['Purchase Request', 'Over Budget'])
+            ->first();
+
+        // --- Ambil Logs ---
+        $approvalLogs = collect(); 
+        if ($approvalRequest) {
+            $approvalLogs = $approvalRequest->logs()->with('approver')->get();
+        }
+
+        // --- Kalkulasi Budget (jika data ada) ---
         if ($purchase->department_id && $purchase->date) {
             $purchaseDateObj = Carbon::parse($purchase->date);
             $month = $purchaseDateObj->month;
             $year = $purchaseDateObj->year;
 
+            // 1. Ambil data Budget Departemen
             $result = MasterBudget::where('department_id', $purchase->department_id)
                                 ->where('bulan', $month)
                                 ->whereYear('periode_awal', $year)
-                                ->where('status', 'approved')
-                                ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used')
+                                ->where('status', 'Approved') 
+                                ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used, SUM(reserved_amount) as total_reserved')
                                 ->first();
-            $currentRemainingBudget = ($result->total_budget ?? 0) - ($result->total_used ?? 0); 
-            $sisaBudgetSetelahPRIni = ($currentRemainingBudget ?? 0) - $purchase->total_amount;
+            
+            $currentRemainingBudget = $result->total_budget ?? 0; // Total Alokasi Dept
+            $sisaBudgetSetelahPRIni = $currentRemainingBudget - ($result->total_used ?? 0) - ($result->total_reserved ?? 0); // Sisa Budget Dept Saat Ini
+
+            // 2. Jika ini Over Budget, ambil juga data Budget Non-Departemen
+            if (isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget') {
+                $nonDeptBudget = MasterBudget::where('department_id', 0) // Asumsi ID 0 untuk non-dept
+                                            ->where('bulan', $month)
+                                            ->whereYear('periode_awal', $year)
+                                            ->where('status', 'Approved')
+                                            ->selectRaw('SUM(grandtotal) as total, SUM(used_amount) as used, SUM(reserved_amount) as reserved')
+                                            ->first();
+                
+                $saldoOverBudget = ($nonDeptBudget->total ?? 0) - ($nonDeptBudget->used ?? 0) - ($nonDeptBudget->reserved ?? 0);
+            }
         }
-
-        $approvalLogs = ApprovalRequestLog::with('approver')
-            ->whereHas('approvalRequest', function ($query) use ($id) {
-                $query->where('requestable_type', 'Purchase Request')
-                    ->where('requestable_id', $id);
-            })
-            ->get();
-
-        // Kirim data budget terkini ke view
+        
+        // Kirim semua data ke view
         return view('purchase::show', compact(
             'purchase', 
             'currentRemainingBudget', 
             'sisaBudgetSetelahPRIni',
-            'approvalLogs'
+            'approvalLogs',
+            'approvalRequest', // Kirim request utama
+            'saldoOverBudget'    // Kirim sisa budget non-dept
         ));
     }
 
