@@ -1,5 +1,7 @@
 <a href="{{ route('master_budget.show', $data->id) }}" class="btn btn-sm btn-info">Detail</a>
+@if(strtolower($data->status) === 'pending')
 <a href="{{ route('master_budget.edit', $data->id) }}" class="btn btn-sm btn-warning">Edit</a>
+@endif
 
 <form action="{{ route('master_budget.destroy', $data->id) }}" method="POST" style="display:inline;">
     @csrf
