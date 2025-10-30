@@ -205,6 +205,17 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             return;
         }
+        // Opsi Jika budget dept kurang dari 0 tidak bisa mengajukan PR
+        // if (remaining <= 0) {
+        //     Swal.fire({
+        //         title: 'Budget Melebihi Batas!',
+        //         text: 'Anda Tidak Bisa Melakukan Pengajuan, Karena Budget Departemen Anda Telah Melebihi Batas',
+        //         icon: 'error',
+        //         confirmButtonText: 'Mengerti',
+        //         confirmButtonColor: '#d33',
+        //     });
+        //     return;
+        // }
         // Jika melebihi budget
         if (remaining < 0) {
             const nonDeptBudgetFormatted = formatRupiah(globalNonDeptBudgetRemaining);
