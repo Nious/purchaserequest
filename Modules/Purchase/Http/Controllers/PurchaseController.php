@@ -1001,7 +1001,7 @@ class PurchaseController extends Controller
         // --- Inisialisasi Variabel ---
         $currentRemainingBudget = 0; // Ini akan menjadi Total Alokasi Budget Dept
         $sisaBudgetSetelahPRIni = 0; // Ini akan menjadi Sisa Budget Dept Saat Ini
-        $sisaOverBudget = 0;         // Ini akan menjadi Sisa Budget Non-Dept
+        $saldoOverBudget = 0;         // Ini akan menjadi Sisa Budget Non-Dept
         $purchaseDateObj = null;
         $month = null;
         $year = null;
