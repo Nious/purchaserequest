@@ -18,9 +18,11 @@
             <h5 class="mb-0 fw-bold text-secondary">Detail Master Budget</h5>
             <div>
                 {{-- Tombol Edit --}}
-                <a href="{{ route('master_budget.edit', $budget->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
-                    <i class="bi bi-pencil-square"></i> Edit
-                </a>
+                @if (strtolower($budget->status) === 'pending')
+                    <a href="{{ route('master_budget.edit', $budget->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
+                        <i class="bi bi-pencil-square"></i> Edit
+                    </a>
+                @endif
 
                 {{-- Status Dropdown --}}
                 @if (strtolower($budget->status) === 'pending')
@@ -110,7 +112,15 @@
                 </tr>
                 <tr>
                     <th>Departemen</th>
-                    <td>{{ $budget->department ? $budget->department->department_name : '-' }}</td>
+                    <td>
+                        @if ($budget->department_id === 0)
+                            All Departement
+                        @elseif ($budget->department)
+                            {{ $budget->department->department_name }}
+                        @else
+                            -
+                        @endif
+                    </td>
                 </tr>
                 <tr>
                     <th>Description</th>

@@ -51,7 +51,15 @@ class MasterBudgetsController extends Controller
         'bulan'          => 'required',
         'periode_awal'   => 'required|date',
         'periode_akhir'  => 'required|date',
-        'department_id'  => 'required|exists:departments,id',
+        'department_id' => [
+            'required',
+            'integer',
+            function ($attribute, $value, $fail) {
+                if ($value != 0 && !\DB::table('departments')->where('id', $value)->exists()) {
+                    $fail('Departemen tidak valid.');
+                }
+            },
+        ],
         'grandtotal'     => 'required',
         'description'    => 'nullable|string',
     ]);
@@ -163,6 +171,12 @@ class MasterBudgetsController extends Controller
     {
          $masterBudget = MasterBudget::with('details')->findOrFail($id);
 
+         if (strtolower($masterBudget->status) !== 'pending') {
+            return redirect()
+                ->route('master_budget.show', $masterBudget->id) // Arahkan kembali ke halaman 'show'
+                ->withErrors(['error' => 'Hanya Master Budget dengan status "Pending" yang dapat diedit.']);
+        }
+
         // Validasi input
         $request->validate([
             'tgl_penyusunan' => 'required|date',
@@ -211,11 +225,32 @@ class MasterBudgetsController extends Controller
 
     public function destroy($id)
     {
-        $budget = MasterBudget::findOrFail($id);
-        $budget->details()->delete();
-        $budget->delete();
 
-        return redirect()->route('master_budget.index')->with('success', 'Budget berhasil dihapus.');
+        $budget = MasterBudget::findOrFail($id);
+
+        try {
+            DB::transaction(function () use ($budget) {
+
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Master Budget')
+                                                ->where('requestable_id', $budget->id)
+                                                ->first();
+                
+                if ($approvalRequest) {
+                    $approvalRequest->logs()->delete();
+                    $approvalRequest->delete(); 
+                }
+
+                $budget->details()->delete();
+
+                $budget->delete();
+            
+            });
+
+            return redirect()->route('master_budget.index')->with('success', 'Budget berhasil dihapus.');
+
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => 'Gagal menghapus Master Budget: ' . $e->getMessage()]);
+        }
     }
 
     public function approve($id)

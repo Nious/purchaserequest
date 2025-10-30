@@ -16,9 +16,11 @@
             @endif
         @endcan
         @can('edit_purchases')
+         @if($data->status == 'pending')
             <a href="{{ route('purchases.edit', $data->id) }}" class="dropdown-item">
                 <i class="bi bi-pencil mr-2 text-primary" style="line-height: 1;"></i> Edit
             </a>
+         @endif
         @endcan
         @can('show_purchases')
             <a href="{{ route('purchases.show', $data->id) }}" class="dropdown-item">
@@ -26,6 +28,7 @@
             </a>
         @endcan
         @can('delete_purchases')
+        @if($data->status != 'approved')
             <button id="delete" class="dropdown-item" onclick="
                 event.preventDefault();
                 if (confirm('Are you sure? It will delete the data permanently!')) {
@@ -37,6 +40,7 @@
                     @method('delete')
                 </form>
             </button>
+            @endif
         @endcan
     </div>
 </div>
