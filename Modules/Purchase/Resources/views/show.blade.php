@@ -190,26 +190,57 @@
                 <div class="card-body table-responsive">
                     <h5 class="fw-bold mb-3 text-dark">Budget Summary</h5>
 
-                    {{-- Gunakan variabel baru --}}
-                    @php $remainingAfterThisPR = $sisaBudgetSetelahPRIni; @endphp 
+                    {{-- Tentukan status untuk pengecekan --}}
+                    @php 
+                        $status = strtolower($purchase->status); 
+                    @endphp
 
                     <table class="table table-striped">
+                        {{-- Tampilkan Grand Total (selalu sama) --}}
                         <tr>
-                            <th class="text-start text-muted">Grand Total</th>
+                            <th class="text-start text-muted">Grand Total PR Ini</th>
                             <td class="text-end fw-bold">{{ format_currency($purchase->total_amount) }}</td>
                         </tr>
-                        <tr>
-                            <th class="text-start text-muted">Budget {{ optional($purchase->department)->department_name ?? '-' }}</th>
-                            <td class="text-end fw-bold">{{ format_currency($currentRemainingBudget) }}</td>
-                        </tr>
-                        <tr>
-                            {{-- Ubah label agar lebih jelas --}}
-                            <th class="text-start text-muted">Sisa Budget (Jika PR Ini Disetujui)</th> 
-                            <td class="text-end fw-bold" style="color: {{ $remainingAfterThisPR < 0 ? 'red' : 'green' }}">
-                                {{-- Tampilkan hasil perhitungan baru --}}
-                                {{ format_currency($remainingAfterThisPR) }} 
-                            </td>
-                        </tr>
+
+                        @if ($status === 'pending')
+                            {{-- 
+                                JIKA MASIH PENDING: 
+                                Tampilkan perhitungan 'live' dari Controller
+                            --}}
+                            
+                            @php $remainingAfterThisPR = $sisaBudgetSetelahPRIni; @endphp 
+
+                            <tr>
+                                <th class="text-start text-muted">Budget Tersedia (Saat Ini)</th>
+                                <td class="text-end fw-bold">{{ format_currency($currentRemainingBudget) }}</td>
+                            </tr>
+                            <tr>
+                                <th class="text-start text-muted">Sisa Budget (Jika Disetujui)</th> 
+                                <td class="text-end fw-bold" style="color: {{ $remainingAfterThisPR < 0 ? 'red' : 'green' }}">
+                                    {{ format_currency($remainingAfterThisPR) }} 
+                                </td>
+                            </tr>
+
+                        @else
+                            {{-- 
+                                JIKA SUDAH APPROVED ATAU REJECTED:
+                                Tampilkan data 'snapshot' yang tersimpan di database purchase
+                            --}}
+
+                            <tr>
+                                <th class="text-start text-muted">Budget Tersedia (Saat Diproses)</th>
+                                <td class="text-end fw-bold">
+                                    {{ format_currency($purchase->master_budget_value ?? 0) }}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-start text-muted">Sisa Budget (Saat Diproses)</th>
+                                <td class="text-end fw-bold {{ ($purchase->master_budget_remaining ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
+                                    {{ format_currency($purchase->master_budget_remaining ?? 0) }}
+                                </td>
+                            </tr>
+                        @endif
+
                     </table>
                 </div>
             </div>

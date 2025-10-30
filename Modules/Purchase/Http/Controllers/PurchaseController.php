@@ -238,7 +238,13 @@ class PurchaseController extends Controller
 
                 if (!$approvalRequest) {
                      // Fallback jika tidak ada Approval Request (seharusnya tidak terjadi jika store benar)
-                     $purchase->update(['status' => 'Approved']);
+                     $budgetSnapshot = $this->getBudgetSnapshot($purchase->department_id, $purchase->date);
+
+                    $purchase->update([
+                        'status' => 'approved',
+                        'master_budget_value' => $budgetSnapshot->total,
+                        'master_budget_remaining' => $budgetSnapshot->remaining - $purchase->total_amount
+                    ]);
                      // Mungkin tambahkan logika update budget dasar di sini jika diperlukan
                      Log::warning("No ApprovalRequest found for Purchase ID: {$purchase->id} during approval.");
                      return; // Keluar dari transaksi
@@ -288,7 +294,13 @@ class PurchaseController extends Controller
                             // 3. Cek jika requester ditemukan di alur level 2
                             if (!$requesterRule) {
                                 // Jika requester tidak ditemukan, anggap alur selesai
-                                $purchase->update(['status' => 'Approved']);
+                                $budgetSnapshot = $this->getBudgetSnapshot($purchase->department_id, $purchase->date);
+
+                                $purchase->update([
+                                    'status' => 'approved',
+                                    'master_budget_value' => $budgetSnapshot->total,
+                                    'master_budget_remaining' => $budgetSnapshot->remaining - $purchase->total_amount
+                                ]);
                                 $approvalRequest->update(['status' => 'approved']);
                                 // ... (Tambahkan logika update budget di sini juga)
                                 if ($purchase->master_budget_id) {
@@ -330,8 +342,13 @@ class PurchaseController extends Controller
                         } else {
                         // --- INI ADALAH LEVEL APPROVAL TERAKHIR ---
                         
-                        // 1. Update Status Purchase & Approval Request
-                        $purchase->update(['status' => 'Approved']);
+                        $budgetSnapshot = $this->getBudgetSnapshot($purchase->department_id, $purchase->date);
+
+                        $purchase->update([
+                            'status' => 'approved',
+                            'master_budget_value' => $budgetSnapshot->total,
+                            'master_budget_remaining' => $budgetSnapshot->remaining - $purchase->total_amount
+                        ]);
                         $approvalRequest->update(['status' => 'approved']);
                         
                         // --- 2. UPDATE BUDGET BERDASARKAN TIPE APPROVAL ---
@@ -412,74 +429,116 @@ class PurchaseController extends Controller
      * Menolak Purchase Request.
      */
     public function reject(Request $request, $id)
-    {
-        $request->validate([
-            'notes' => 'required|string|min:5',
-        ]);
-        
-        $purchase = Purchase::findOrFail($id);
+{
+    $request->validate([
+        'notes' => 'required|string|min:5',
+    ]);
+    
+    $purchase = Purchase::findOrFail($id);
 
-        // 1. Cek otorisasi (sesuaikan nama Gate Anda)
-        if (! Gate::allows('approve_purchases', $purchase)) {
-            return response()->json(['error' => 'Anda tidak punya akses untuk reject.'], 403);
-        }
+    if (! Gate::allows('approve_purchases', $purchase)) {
+        return response()->json(['error' => 'Anda tidak punya akses untuk reject.'], 403);
+    }
 
-        try {
-            DB::transaction(function () use ($purchase, $request) {
+    try {
+        DB::transaction(function () use ($purchase, $request) {
+            
+            // --- 1. Cari Approval Request TERKAIT (Bisa Normal atau Over Budget) ---
+            $approvalRequest = ApprovalRequest::where('requestable_id', $purchase->id)
+                ->whereIn('requestable_type', ['Purchase Request', 'Over Budget']) // Cari salah satu
+                ->first();
+
+            if ($approvalRequest) {
                 
-                // --- Cari Approval Request ---
-                $approvalRequest = ApprovalRequest::where('requestable_type', 'Purchase Request') // <-- GANTI STRING
-                                                  ->where('requestable_id', $purchase->id)
-                                                  ->first();
+                // --- 2. Update Log Approval ---
+                $log = $approvalRequest->logs()
+                    ->where('user_id', Auth::id())
+                    ->where('level', $approvalRequest->current_level)   
+                    ->where('action', 'assigned')
+                    ->first(); 
+                
+                if (!$log) {
+                    throw new \Exception('Anda tidak berwenang memproses permintaan ini di level saat ini.');
+                }
+                
+                $log->update([
+                    'action'  => 'rejected',
+                    'comment' => $request->notes,
+                ]);
 
-                if ($approvalRequest) {
-                    
-                    $log = $approvalRequest->logs()
-                        ->where('user_id', Auth::id())
-                        ->where('level', $approvalRequest->current_level)   
-                        ->where('action', 'assigned')
-                        ->first(); 
-                    
-                    if (!$log) {
-                        throw new \Exception('Anda tidak berwenang memproses permintaan ini di level saat ini.');
+                $snapshot = $this->getBudgetSnapshot($purchase->department_id, $purchase->date, $purchase->total_amount);
+
+                $purchase->update([
+                    'status' => 'rejected',
+                    // 'note'   => $request->notes,
+                    'master_budget_value' => $snapshot->total,
+                    'master_budget_remaining' => $snapshot->remaining
+                ]);
+                $approvalRequest->update(['status' => 'rejected']);
+                
+                // --- 4. KEMBALIKAN BUDGET BERDASARKAN TIPE APPROVAL ---
+                $purchaseDate = Carbon::parse($purchase->date);
+                $month = $purchaseDate->month;
+                $year = $purchaseDate->year;
+
+                if ($approvalRequest->requestable_type === 'Over Budget') {
+                    // === Logika Rollback untuk Over Budget ===
+                    $overageAmount = abs($purchase->master_budget_remaining ?? 0); 
+                    $amountUsedFromDept = $purchase->total_amount - $overageAmount;
+
+                    // a. Kembalikan budget Departemen
+                    $budgetDepartemen = MasterBudget::where('department_id', $purchase->department_id)
+                        ->where('bulan', $month)->whereYear('periode_awal', $year)->where('status', 'Approved')
+                        ->first();
+                    if ($budgetDepartemen) {
+                        // (Asumsi 'Over Budget' langsung masuk 'used_amount' saat store, bukan 'reserved')
+                        // Ganti 'used_amount' ke 'reserved_amount' jika Anda pakai 'reserved' di 'store'
+                        $budgetDepartemen->used_amount -= $amountUsedFromDept;
+                        if($budgetDepartemen->used_amount < 0) $budgetDepartemen->used_amount = 0;
+                        $budgetDepartemen->save();
                     }
-                    
-                    $log->update([
-                        'action'  => 'rejected',
-                        'comment' => $request->notes,
-                    ]);
 
-                    // --- Langsung hentikan dan update semua status ---
-                    $purchase->update([
-                        'status' => 'rejected',
-                        // 'note'   => $request->notes
-                    ]);
-                    $approvalRequest->update(['status' => 'rejected']);
-                    
-                    // --- KEMBALIKAN BUDGET YANG DI-RESERVE ---
+                    // b. Kembalikan budget Non-Departemen
+                    $nonDeptBudget = MasterBudget::where('department_id', 0) // Asumsi ID 0
+                        ->where('bulan', $month)->whereYear('periode_awal', $year)->where('status', 'Approved')
+                        ->first();
+                    if ($nonDeptBudget) {
+                        $nonDeptBudget->used_amount -= $overageAmount;
+                        if($nonDeptBudget->used_amount < 0) $nonDeptBudget->used_amount = 0;
+                        $nonDeptBudget->save();
+                    }
+
+                } else { // Berarti tipenya 'Purchase Request' (Alur Normal)
+                    // === Logika Rollback untuk Normal ===
                     if ($purchase->master_budget_id) {
                         $budget = MasterBudget::find($purchase->master_budget_id);
                         if ($budget) {
-                            // $budget->reserved_amount -= $purchase->total_amount;
+                            // Kembalikan 'reserved_amount' (karena 'store' Anda menambah 'reserved_amount')
+                            $budget->reserved_amount -= $purchase->total_amount; 
+                            if ($budget->reserved_amount < 0) $budget->reserved_amount = 0;
                             $budget->save();
                         }
                     }
-                
-                } else {
-                    // Fallback jika tidak ada Approval Request
-                    $purchase->update([
-                        'status' => 'rejected',
-                        // 'note'   => $request->notes
-                    ]);
                 }
-            }); // Transaksi selesai
-
-            return response()->json(['success' => true, 'message' => 'Purchase Request berhasil ditolak.']);
             
-        } catch (\Throwable $e) {
-            return response()->json(['error' => $e->getMessage()], 500);
-        }
+            } else {
+                $snapshot = $this->getBudgetSnapshot($purchase->department_id, $purchase->date, $purchase->total_amount);
+
+                $purchase->update([
+                    'status' => 'rejected',
+                    // 'note'   => $request->notes,
+                    'master_budget_value' => $snapshot->total,
+                    'master_budget_remaining' => $snapshot->remaining
+                ]);
+            }
+        }); // Transaksi selesai
+
+        return response()->json(['success' => true, 'message' => 'Purchase Request berhasil ditolak.']);
+        
+    } catch (\Throwable $e) {
+        return response()->json(['error' => $e->getMessage()], 500);
     }
+}
 
     /**
      * Simpan data purchase baru.
@@ -1070,5 +1129,39 @@ class PurchaseController extends Controller
             Log::error("Error deleting purchase ID {$purchase->id}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             return back()->withErrors(['error' => 'Gagal menghapus Purchase Request: ' . $e->getMessage()]);
         }
+    }
+
+    private function getBudgetSnapshot($department_id, $date, $purchaseTotalAmount = 0)
+    {
+        if (!$department_id || !$date) {
+            return (object)['current_remaining' => 0, 'remaining_after_this_pr' => 0];
+        }
+
+        $purchaseDateObj = Carbon::parse($date);
+        $month = $purchaseDateObj->month;
+        $year = $purchaseDateObj->year;
+
+        // 1. Ambil data budget (HANYA grandtotal dan used_amount, TANPA reserved_amount)
+        //    (Sesuai dengan logika di method show() Anda)
+        $result = MasterBudget::where('department_id', $department_id)
+                            ->where('bulan', $month)
+                            ->whereYear('periode_awal', $year)
+                            ->where('status', 'Approved') // Pastikan 'Approved'
+                            ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used')
+                            ->first();
+        
+        // 2. Hitung Sisa Budget SAAT INI (Total Alokasi - Yang Sudah Dipakai)
+        $currentRemainingBudget = ($result->total_budget ?? 0) - ($result->total_used ?? 0);
+        
+        // 3. Hitung Sisa Budget SETELAH DIKURANGI PR INI
+        $sisaBudgetSetelahPRIni = $currentRemainingBudget - $purchaseTotalAmount;
+
+        return (object)[
+            // Ini adalah 'currentRemainingBudget' dari contoh Anda
+            'total' => $currentRemainingBudget, 
+            
+            // Ini adalah 'sisaBudgetSetelahPRIni' dari contoh Anda
+            'remaining' => $sisaBudgetSetelahPRIni
+        ];
     }
 }
