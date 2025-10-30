@@ -171,6 +171,12 @@ class MasterBudgetsController extends Controller
     {
          $masterBudget = MasterBudget::with('details')->findOrFail($id);
 
+         if (strtolower($masterBudget->status) !== 'pending') {
+            return redirect()
+                ->route('master_budget.show', $masterBudget->id) // Arahkan kembali ke halaman 'show'
+                ->withErrors(['error' => 'Hanya Master Budget dengan status "Pending" yang dapat diedit.']);
+        }
+
         // Validasi input
         $request->validate([
             'tgl_penyusunan' => 'required|date',
@@ -225,7 +231,7 @@ class MasterBudgetsController extends Controller
         try {
             DB::transaction(function () use ($budget) {
 
-                $approvalRequest = ApprovalRequest::where('requestable_type', 'Master Budget') // <-- Sesuaikan string ini
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Master Budget')
                                                 ->where('requestable_id', $budget->id)
                                                 ->first();
                 
