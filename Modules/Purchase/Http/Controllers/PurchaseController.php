@@ -795,103 +795,20 @@ class PurchaseController extends Controller
     /**
      * Update Purchase.
      */
-
-    // public function update(UpdatePurchaseRequest $request, Purchase $purchase)
-    // {
-    //     abort_if(Gate::denies('edit_purchases'), 403);
-
-    //     DB::transaction(function () use ($request, $purchase) {
-
-    //         $paid_amount   = (int) str_replace(['.', ','], '', $request->paid_amount ?? 0);
-    //         $total_amount  = (int) str_replace(['.', ','], '', $request->total_amount ?? 0);
-    //         $shipping_amount = (int) str_replace(['.', ','], '', $request->shipping_amount ?? 0);
-    //         $budget_value  = (int) str_replace(['.', ','], '', $request->master_budget_value ?? 0);
-    //         $remaining_budget = (int) str_replace(['.', ','], '', $request->master_budget_remaining ?? 0);
-
-    //         $due_amount = $total_amount - $paid_amount;
-
-    //         if ($due_amount == $total_amount) {
-    //             $payment_status = 'Unpaid';
-    //         } elseif ($due_amount > 0) {
-    //             $payment_status = 'Partial';
-    //         } else {
-    //             $payment_status = 'Paid';
-    //         }
-
-    //         $budget = MasterBudget::find($request->master_budget_id);
-
-    //         // Hapus detail lama
-    //         foreach ($purchase->purchaseDetails as $detail) {
-    //             if ($purchase->status == 'Completed') {
-    //                 $product = Product::findOrFail($detail->product_id);
-    //                 $product->update([
-    //                     'product_quantity' => $product->product_quantity - $detail->quantity
-    //                 ]);
-    //             }
-    //             $detail->delete();
-    //         }
-
-    //         $purchase->update([
-    //             'date' => $request->date ?? now(),
-    //             'supplier_id' => $request->supplier_id ?? null,
-    //             'users_id' => $request->users_id ?? auth()->id(),
-    //             'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
-    //             'master_budget_id' => $budget?->id,
-    //             'total_amount' => $total_amount,
-    //             'master_budget_value' => $budget_value,
-    //             'master_budget_remaining' => $remaining_budget,
-    //             'due_amount' => $due_amount ?? 0,
-    //             'status' => $request->status ?? 'Pending',
-    //             'payment_status' => $payment_status,
-    //             'note' => $request->note ?? '',
-    //         ]);
-
-    //         foreach (Cart::instance('purchase')->content() as $cart_item) {
-    //             PurchaseDetail::create([
-    //                 'purchase_id' => $purchase->id,
-    //                 'product_id' => $cart_item->id,
-    //                 'product_name' => $cart_item->name,
-    //                 'product_code' => $cart_item->options->code,
-    //                 'product_unit' => $product->product_unit ?? '-',
-    //                 'quantity' => $cart_item->qty,
-    //                 'price' => (int) $cart_item->price,
-    //                 'unit_price' => (int) $cart_item->options->unit_price,
-    //                 'sub_total' => (int) $cart_item->options->sub_total,
-    //                 'product_discount_amount' => (int) $cart_item->options->product_discount,
-    //                 'product_discount_type' => $cart_item->options->product_discount_type,
-    //                 'product_tax_amount' => (int) $cart_item->options->product_tax,
-    //             ]);
-    //         }
-
-    //         if ($budget) {
-    //             $budget->remaining_budget = $remaining_budget;
-    //             $budget->save();
-    //         }
-
-    //         Cart::instance('purchase')->destroy();
-    //     });
-
-    //     toast('Purchase Updated!', 'info');
-    //     return redirect()->route('purchases.index');
-    // }
-
     public function update(UpdatePurchaseRequest $request, Purchase $purchase)
     {
         abort_if(Gate::denies('edit_purchases'), 403);
 
-        // Hanya izinkan update jika status masih 'Pending' atau 'Rejected'
-        if (!in_array($purchase->status, ['pending', 'rejected'])) {
+        if (!in_array($purchase->status, ['pending'])) {
              return redirect()->route('purchases.show', $purchase->id)
-                         ->withErrors(['error' => 'Hanya PR dengan status Pending atau Rejected yang bisa diupdate.']);
+                         ->withErrors(['error' => 'Hanya PR dengan status Pending yang bisa diupdate.']);
         }
 
         try {
-            // Ambil Engine secara manual
             $approvalEngine = app(ApprovalEngine::class);
 
             DB::transaction(function () use ($request, $purchase, $approvalEngine) {
 
-                // --- 1. Persiapan Data ---
                 $total_amount     = $request->total_amount ?? 0;
                 $budget_value     = $request->master_budget_value ?? 0;
                 $remaining_budget = $request->master_budget_remaining ?? 0; // Sisa budget (bisa negatif)
@@ -909,19 +826,15 @@ class PurchaseController extends Controller
                     $payment_status = 'Paid';
                 }
 
-                // --- 2. Update Master Budget (Kembalikan & Reserve Baru) ---
-                
-                // Kembalikan amount LAMA dari budget LAMA
                 if ($old_budget_id) {
                     $oldBudget = MasterBudget::find($old_budget_id);
                     if ($oldBudget) {
                         // Asumsi 'Pending' menggunakan 'reserved_amount'
-                        $oldBudget->reserved_amount -= $old_total_amount; 
+                        // $oldBudget->reserved_amount -= $old_total_amount; 
                         $oldBudget->save();
                     }
                 }
 
-                // Cari budget BARU
                 $newBudget = null;
                 if ($request->department_id && $request->date) {
                     $purchaseDate = Carbon::parse($request->date);
@@ -932,23 +845,19 @@ class PurchaseController extends Controller
                                           ->first();
                 }
 
-                // Ambil (Reserve) amount BARU dari budget BARU
                 if ($newBudget) {
-                    $newBudget->reserved_amount += $total_amount;
+                    // $newBudget->reserved_amount += $total_amount;
                     $newBudget->save();
                 }
-                // --- Batas Logika Budget ---
 
-
-                // --- 3. Hapus Detail Lama & Update Purchase ---
-                $purchase->purchaseDetails()->delete(); // Hapus detail lama
+                $purchase->purchaseDetails()->delete(); 
 
                 $purchase->update([
                     'date' => $request->date ?? now(),
                     'supplier_id' => $request->supplier_id ?? null,
                     'users_id' => $request->users_id ?? auth()->id(),
                     'department_id' => $request->department_id ?? optional(auth()->user())->department_id,
-                    'master_budget_id' => $newBudget?->id, // Set ID budget baru
+                    'master_budget_id' => $newBudget?->id,
                     'total_amount' => $total_amount,
                     'master_budget_value' => $budget_value,
                     'master_budget_remaining' => $remaining_budget,
@@ -958,7 +867,6 @@ class PurchaseController extends Controller
                     'note' => $request->note ?? '',
                 ]);
 
-                // --- 4. Buat Ulang Detail ---
                 foreach (Cart::instance('purchase')->content() as $cart_item) {
                     PurchaseDetail::create([
                         'purchase_id' => $purchase->id,
@@ -976,28 +884,21 @@ class PurchaseController extends Controller
                     ]);
                 }
 
-                // --- 5. Hapus Approval Request Lama ---
-                // Cari SEMUA request lama (Normal atau Over Budget) dan hapus
                 ApprovalRequest::where('requestable_id', $purchase->id)
-                    ->whereIn('requestable_type', ['Purchase Request', 'Over Budget']) // Sesuaikan string
-                    ->delete(); // Ini juga akan menghapus logs jika relasi DB di-set cascade
+                    ->whereIn('requestable_type', ['Purchase Request', 'Over Budget']) 
+                    ->delete(); 
 
-
-                // --- 6. Tentukan Alur Approval Baru & Buat Request ---
                 $ruleName = '';
                 $requestableType = '';
 
                 if ($remaining_budget < 0) {
-                    // === ALUR OVER BUDGET ===
-                    $ruleName = 'Over Budget'; // Sesuaikan dengan nama di tabel approval_types
+                    $ruleName = 'Over Budget'; 
                     $requestableType = 'Over Budget';
                 } else {
-                    // === ALUR NORMAL ===
-                    $ruleName = 'Purchase Request'; // Sesuaikan nama
+                    $ruleName = 'Purchase Request';
                     $requestableType = 'Purchase Request';
                 }
 
-                // Cari rule berdasarkan nama yang ditentukan
                 $rule = ApprovalRule::whereHas('type', function ($query) use ($ruleName) {
                     $query->where('approval_name', $ruleName);
                 })->where('is_active', true)->first();
@@ -1006,8 +907,7 @@ class PurchaseController extends Controller
                     throw new \Exception("Aturan Approval (Approval Rule) untuk '{$ruleName}' tidak ditemukan.");
                 }
                 $approvalTypesId = $rule->approval_types_id;
-                
-                // Buat approval request baru
+
                 $approvalRequest = $approvalEngine->createRequest(
                     $requestableType,
                     $purchase->id,
@@ -1055,13 +955,11 @@ class PurchaseController extends Controller
             $currentRemainingBudget = ($result->total_budget ?? 0) - ($result->total_used ?? 0); 
             $sisaBudgetSetelahPRIni = ($currentRemainingBudget ?? 0) - $purchase->total_amount;
         }
-        // --- BATAS TAMBAHAN ---
 
-        $approvalLogs = ApprovalRequestLog::with('approver') // Ambil juga data user approver
+        $approvalLogs = ApprovalRequestLog::with('approver')
             ->whereHas('approvalRequest', function ($query) use ($id) {
-                // Filter relasi 'approvalRequest'
-                $query->where('requestable_type', 'Purchase Request') // Sesuaikan string 'Master Budget'
-                    ->where('requestable_id', $id); // Cocokkan dengan ID MasterBudget
+                $query->where('requestable_type', 'Purchase Request')
+                    ->where('requestable_id', $id);
             })
             ->get();
 
@@ -1083,24 +981,19 @@ class PurchaseController extends Controller
 
         try {
             DB::transaction(function () use ($purchase) {
-                
-                // --- 1. IDENTIFY THE TYPE OF APPROVAL (IF ANY) ---
-                // Find any related approval request to determine the scenario
+
                 $approvalRequest = ApprovalRequest::where('requestable_id', $purchase->id)
                                         ->whereIn('requestable_type', ['Purchase Request', 'Over Budget'])
-                                        ->first(); // Get the first one found (usually only one exists per purchase)
+                                        ->first();
 
-                // --- 2. REVERSE BUDGET CHANGES (ONLY IF NOT REJECTED/CANCELLED) ---
                 if (!in_array($purchase->status, ['rejected', 'cancelled'])) {
                     
                     $purchaseDate = Carbon::parse($purchase->date);
                     $month = $purchaseDate->month;
                     $year = $purchaseDate->year;
 
-                    // Check if it was an OVER BUDGET approval that was completed
                     if ($approvalRequest && $approvalRequest->requestable_type === 'Over Budget' && $purchase->status === 'approved') {
-                        
-                        // a. Reverse Department Budget (used_amount was increased by 'total - overage')
+
                         $budgetDepartemen = MasterBudget::where('department_id', $purchase->department_id)
                             ->where('bulan', $month)->whereYear('periode_awal', $year)->where('status', 'approved')
                             ->first();
@@ -1117,7 +1010,6 @@ class PurchaseController extends Controller
                             Log::warning("Dept Budget not found for Purchase ID {$purchase->id} during Over Budget deletion rollback.");
                         }
 
-                        // b. Reverse Non-Department Budget (used_amount was increased by 'overage')
                         $nonDeptBudget = MasterBudget::where('department_id', 0) // Assuming 0 for non-dept
                             ->where('bulan', $month)->whereYear('periode_awal', $year)->where('status', 'approved')
                             ->first();
@@ -1132,20 +1024,17 @@ class PurchaseController extends Controller
                             Log::warning("Non-Dept Budget not found for Purchase ID {$purchase->id} during Over Budget deletion rollback.");
                         }
 
-                    // Check if it was a NORMAL Purchase Request approval/pending
                     } elseif ($approvalRequest && $approvalRequest->requestable_type === 'Purchase Request') {
                         
                         $budgetDepartemen = MasterBudget::find($purchase->master_budget_id); // Use the stored ID
 
                         if ($budgetDepartemen) {
                             if ($purchase->status == 'Pending') {
-                                // Reverse reserved amount
                                 $budgetDepartemen->reserved_amount -= $purchase->total_amount;
                                 if ($budgetDepartemen->reserved_amount < 0) $budgetDepartemen->reserved_amount = 0;
                                 Log::info("Reversed Dept Budget (Pending Normal PR) for Purchase ID {$purchase->id}. Reserved Amount: -" . $purchase->total_amount);
 
                             } elseif ($purchase->status == 'approved' || $purchase->status == 'Completed') {
-                                // Reverse used amount
                                 $budgetDepartemen->used_amount -= $purchase->total_amount;
                                 if ($budgetDepartemen->used_amount < 0) $budgetDepartemen->used_amount = 0;
                                 Log::info("Reversed Dept Budget (Approved Normal PR) for Purchase ID {$purchase->id}. Used Amount: -" . $purchase->total_amount);
@@ -1155,34 +1044,29 @@ class PurchaseController extends Controller
                             Log::warning("Dept Budget (ID: {$purchase->master_budget_id}) not found for Purchase ID {$purchase->id} during Normal PR deletion rollback.");
                         }
                     }
-                    // Else: No relevant approval found or status mismatch, maybe log this?
-                    else if ($purchase->master_budget_id) { // If there was a budget ID but no matching approval found for rollback logic
+                    else if ($purchase->master_budget_id) {
                         Log::warning("Could not determine correct budget rollback logic for Purchase ID {$purchase->id}. Status: {$purchase->status}, Approval Type: " . ($approvalRequest->requestable_type ?? 'None'));
                     }
 
-                } // End budget reversal logic
+                }
 
-                // --- 3. HAPUS APPROVAL REQUESTS TERKAIT ---
-                // Lebih simpel: Hapus semua request yang terkait dengan purchase ID ini
                 $relatedApprovalRequests = ApprovalRequest::where('requestable_id', $purchase->id)
                                             ->whereIn('requestable_type', ['Purchase Request', 'Over Budget']) // Be specific
                                             ->get();
                 
                 foreach($relatedApprovalRequests as $req) {
-                    $req->logs()->delete(); // Hapus logs dulu
-                    $req->delete();         // Hapus request utama
+                    $req->logs()->delete();
+                    $req->delete();        
                 }
 
-                // --- 4. HAPUS PURCHASE (DAN DETAILNYA) ---
-                $purchase->delete(); // Ini akan otomatis menghapus purchase_details (jika relasi di model di-set cascade)
+                $purchase->delete();
             
-            }); // Transaksi selesai
+            });
 
             toast('Purchase Deleted!', 'warning');
             return redirect()->route('purchases.index');
 
         } catch (\Throwable $e) {
-            // Jika ada error, rollback dan tampilkan pesan
             Log::error("Error deleting purchase ID {$purchase->id}: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             return back()->withErrors(['error' => 'Gagal menghapus Purchase Request: ' . $e->getMessage()]);
         }

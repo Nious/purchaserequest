@@ -219,11 +219,32 @@ class MasterBudgetsController extends Controller
 
     public function destroy($id)
     {
-        $budget = MasterBudget::findOrFail($id);
-        $budget->details()->delete();
-        $budget->delete();
 
-        return redirect()->route('master_budget.index')->with('success', 'Budget berhasil dihapus.');
+        $budget = MasterBudget::findOrFail($id);
+
+        try {
+            DB::transaction(function () use ($budget) {
+
+                $approvalRequest = ApprovalRequest::where('requestable_type', 'Master Budget') // <-- Sesuaikan string ini
+                                                ->where('requestable_id', $budget->id)
+                                                ->first();
+                
+                if ($approvalRequest) {
+                    $approvalRequest->logs()->delete();
+                    $approvalRequest->delete(); 
+                }
+
+                $budget->details()->delete();
+
+                $budget->delete();
+            
+            });
+
+            return redirect()->route('master_budget.index')->with('success', 'Budget berhasil dihapus.');
+
+        } catch (\Throwable $e) {
+            return back()->withErrors(['error' => 'Gagal menghapus Master Budget: ' . $e->getMessage()]);
+        }
     }
 
     public function approve($id)

@@ -147,13 +147,11 @@ document.addEventListener('livewire:init', () => {
             return 'Rp' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
         };
 
-        // Update tampilan
         document.getElementById('grand_total_display').innerText = formatRupiah(payload.total_amount);
         document.getElementById('budget_display').innerText = formatRupiah(payload.master_budget_value);
         const sisa = document.getElementById('sisa_budget_display');
         sisa.innerText = formatRupiah(payload.master_budget_remaining);
 
-        // Warna merah jika minus
         if (payload.master_budget_remaining < 0) {
             sisa.classList.add('text-danger', 'fw-bold');
             sisa.classList.remove('text-success');
@@ -162,7 +160,6 @@ document.addEventListener('livewire:init', () => {
             sisa.classList.add('text-success');
         }
 
-        // Hidden input update
         document.getElementById('total_amount').value = payload.total_amount;
         document.getElementById('master_budget_value').value = payload.master_budget_value;
         document.getElementById('master_budget_remaining').value = payload.master_budget_remaining;
@@ -182,25 +179,43 @@ document.addEventListener('DOMContentLoaded', function () {
 
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('purchase-form');
-    const status = '{{ $purchase->status }}'; // Ambil status dari server
+    const status = '{{ strtolower($purchase->status) }}';
 
-    // === 🔔 Munculkan notifikasi otomatis jika status pending ===
-    if (status === 'pending') {
+    if (status === 'approved' || status === 'rejected') {
+
+        form.querySelectorAll('input, textarea, select').forEach(element => {
+            element.disabled = true;
+        });
+
+        const submitButton = form.querySelector('button[type="submit"]');
+        if (submitButton) {
+            submitButton.style.display = 'none';
+        }
+
+        const searchProduct = document.querySelector('livewire\\:search-product');
+        if (searchProduct) {
+            searchProduct.style.display = 'none';
+        }
+
         Swal.fire({
-            title: 'Menunggu Approval',
-            text: 'Purchase Request ini masih menunggu persetujuan. Anda masih bisa mengedit sebelum disetujui.',
+            title: `Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+            text: 'Purchase Request ini tidak dapat diedit lagi karena sudah diproses.',
             icon: 'info',
             confirmButtonText: 'Mengerti',
             confirmButtonColor: '#3085d6'
         });
     }
 
-    // === Konfirmasi sebelum submit ===
     form.addEventListener('submit', function (e) {
-        e.preventDefault(); // cegah submit langsung
+        e.preventDefault();
+
+        if (status !== 'pending') {
+             Swal.fire('Gagal', 'Data ini tidak dapat diubah lagi.', 'error');
+             return;
+        }
 
         Swal.fire({
-            title: 'PR sedang menunggu approval',
+            title: 'Edit Purchase Request?',
             text: 'Apakah kamu yakin mau mengedit data ini?',
             icon: 'warning',
             showCancelButton: true,
@@ -211,7 +226,7 @@ document.addEventListener('DOMContentLoaded', function () {
             cancelButtonColor: '#d33',
         }).then((result) => {
             if (result.isConfirmed) {
-                form.submit(); // lanjutkan submit jika user klik Yes
+                form.submit();
             }
         });
     });
