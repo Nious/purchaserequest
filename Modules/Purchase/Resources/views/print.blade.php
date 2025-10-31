@@ -34,7 +34,7 @@
         .no-border { border: none !important; }
         .text-right { text-align: right; }
         .mt-2 { margin-top: 10px; }
-        .margin-a4 { padding-top: 150px; padding-left:50px; padding-right:50px; padding-bottom:50px;}
+        .margin-a4 { padding-top: 175px; padding-left:75px; padding-right:75px; padding-bottom:100px;}
     </style>
 </head>
 <body>

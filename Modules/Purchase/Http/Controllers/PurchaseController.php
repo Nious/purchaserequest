@@ -1225,12 +1225,21 @@ class PurchaseController extends Controller
             $supplier = Supplier::find($purchase->supplier_id);
         }
 
+        $purchaseDate = Carbon::parse($purchase->date);
+        $day = $purchaseDate->day;
+        $month = $purchaseDate->month;
+        $year = $purchaseDate->year;
+
         // Ini adalah cara Dompdf (sintaksnya hampir identik)
         $pdf = PDF::loadView('purchase::print', [
             'purchase' => $purchase,
             'supplier' => $supplier,
-        ])->setPaper('a4', 'portrait'); // 'portrait' (opsional, tapi disarankan)
+        ])->setPaper('a4', 'portrait')
+        ->setOption('margin-top', 0)
+        ->setOption('margin-right', 0)
+        ->setOption('margin-bottom', 0)
+        ->setOption('margin-left', 0);
 
-        return $pdf->stream('purchase-'. $purchase->reference .'.pdf');
+        return $pdf->stream('Purchase Request-'. $purchase->reference .'-('. $day .'-'. $month .'-'. $year .').pdf');
     }
 }
