@@ -11,6 +11,16 @@
 </ol>
 @endsection
 
+@php
+    $status = strtolower($budget->status);
+    
+    // 1. Cek apakah user yg login adalah approver di level ini
+    $isCurrentUserApprover = $approvalLogs
+                                ->where('action', 'assigned') // Cari yang masih menunggu
+                                ->where('user_id', Auth::id()) // Cocokkan dengan user yg login
+                                ->isNotEmpty(); // true jika user ditemukan
+@endphp
+
 @section('content')
 <div class="container-fluid mb-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -18,7 +28,7 @@
             @if($budget->department_id === 0)
                 <span class="badge bg-danger ms-2">Over Budget</span>
             @else
-                <span class="badge bg-info ms-2">Master Budget</span>
+                <span class="badge bg-info ms-2">{{ $budget->department->department_name }}</span>
             @endif
         </h3>
         <div>
@@ -30,18 +40,28 @@
             @endif
 
             {{-- Status Dropdown --}}
-            @if (strtolower($budget->status) === 'pending')
+            @if ($status === 'pending' && $isCurrentUserApprover)
                 <button class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
-                    <i class="bi bi-hourglass-split"></i> Pending
+                    <i class="bi bi-person-check"></i> Menunggu Aksi Anda
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
                     <li><a href="#" class="dropdown-item approval-action" data-status="approved">✅ Approve</a></li>
                     <li><a href="#" class="dropdown-item approval-action" data-status="rejected">❌ Reject</a></li>
                 </ul>
-            @elseif (strtolower($budget->status) === 'approved')
-                <button class="btn btn-sm btn-success" disabled>Approved</button>
-            @elseif (strtolower($budget->status) === 'rejected')
-                <button class="btn btn-sm btn-danger" disabled>Rejected</button>
+
+            {{-- 3. Tampilkan status sebagai teks non-interaktif untuk kasus lain --}}
+            @elseif ($status === 'pending')
+                <button class="btn btn-sm btn-warning" disabled>
+                    <i class="bi bi-hourglass-split"></i> Pending
+                </button>
+            @elseif ($status === 'approved')
+                <button class="btn btn-sm btn-success" disabled>
+                    <i class="bi bi-check2-circle"></i> Approved
+                </button>
+            @elseif ($status === 'rejected')
+                <button class="btn btn-sm btn-danger" disabled>
+                    <i class="bi bi-x-circle"></i> Rejected
+                </button>
             @else
                 <button class="btn btn-sm btn-secondary" disabled>Unknown</button>
             @endif

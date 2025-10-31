@@ -27,9 +27,22 @@
 
             {{-- Status Dropdown --}}
             <div class="btn-group">
-                @if ($purchase->status === 'pending')
+
+                {{-- 1. Definisikan variabel pengecekan --}}
+                @php
+                    $status = strtolower($purchase->status);
+                    
+                    // Cek apakah user yg login adalah approver di level ini
+                    $isCurrentUserApprover = $approvalLogs
+                                                ->where('action', 'assigned') // Cari yang masih menunggu
+                                                ->where('user_id', Auth::id()) // Cocokkan dengan user yg login
+                                                ->isNotEmpty(); // true jika user ditemukan
+                @endphp
+            
+                {{-- 2. Tampilkan dropdown HANYA jika status pending DAN user adalah approver --}}
+                @if ($status === 'pending' && $isCurrentUserApprover)
                     <button class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
-                        <i class="bi bi-hourglass-split"></i> Pending
+                        <i class="bi bi-person-check"></i> Menunggu Aksi Anda
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li>
@@ -43,11 +56,19 @@
                             </a>
                         </li>
                     </ul>
-                @elseif ($purchase->status === 'approved')
+            
+                {{-- 3. Tampilkan status 'Pending' (non-aktif) jika user BUKAN approver --}}
+                @elseif ($status === 'pending')
+                    <button class="btn btn-sm btn-warning" disabled>
+                        <i class="bi bi-hourglass-split"></i> Pending
+                    </button>
+            
+                {{-- 4. Tampilkan status final (Approved / Rejected) --}}
+                @elseif ($status === 'approved')
                     <button class="btn btn-sm btn-success" disabled>
                         <i class="bi bi-check2-circle"></i> Approved
                     </button>
-                @elseif ($purchase->status === 'rejected')
+                @elseif ($status === 'rejected')
                     <button class="btn btn-sm btn-danger" disabled>
                         <i class="bi bi-x-circle"></i> Rejected
                     </button>
