@@ -78,8 +78,25 @@ class MasterBudgetsDataTable extends DataTable
             ->buttons(
                 Button::make('excel')
                     ->text('<i class="bi bi-file-earmark-excel-fill"></i> Excel'),
-                Button::make('print')
-                    ->text('<i class="bi bi-printer-fill"></i> Print'),
+                    [
+                        'text' => '<i class="bi bi-printer-fill"></i> Print PDF',
+                        'className' => 'btn-primary', // (Opsional)
+                        'action' => "
+                            function ( e, dt, node, config ) {
+                                // 1. Dapatkan nilai search saat ini dari DataTable
+                                var searchValue = dt.search();
+                                
+                                // 2. Buat URL ke rute printAll
+                                var url = '".route('master_budget.printAll')."';
+                                
+                                // 3. Tambahkan parameter search ke URL
+                                url += '?search=' + encodeURIComponent(searchValue);
+                                
+                                // 4. Buka URL di tab baru
+                                window.open(url, '_blank');
+                            }
+                        "
+                    ],
                 Button::make('reset')
                     ->text('<i class="bi bi-x-circle"></i> Reset'),
                 Button::make('reload')

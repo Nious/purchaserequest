@@ -1242,4 +1242,39 @@ class PurchaseController extends Controller
 
         return $pdf->stream('Purchase Request-'. $purchase->reference .'-('. $day .'-'. $month .'-'. $year .').pdf');
     }
+
+    public function printAll(Request $request)
+    {
+        // 1. Mulai query dasar (sama seperti di query() DataTable)
+        $query = Purchase::with(['user', 'department']);
+
+        // 2. Tiru filter search dari DataTable
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            
+            // Sesuaikan ini agar cocok dengan kolom yang bisa dicari
+            $query->where(function($q) use ($search) {
+                $q->where('reference', 'LIKE', "%{$search}%")
+                  ->orWhere('status', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function($uq) use ($search) {
+                      $uq->where('name', 'LIKE', "%{$search}%");
+                  })
+                  ->orWhereHas('department', function($dq) use ($search) {
+                      $dq->where('department_name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+        
+        $purchases = $query->orderBy('date', 'desc')->get();
+        
+        // 3. Muat view 'print_all' dengan data
+        $pdf = PDF::loadView('purchase::print_all', compact('purchases'))
+                    ->setPaper('a4', 'portrait')
+                    ->setOption('margin-top', 0)
+                    ->setOption('margin-right', 0)
+                    ->setOption('margin-bottom', 0)
+                    ->setOption('margin-left', 0);
+
+        return $pdf->stream('semua-purchase-request.pdf');
+    }
 }
