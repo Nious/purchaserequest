@@ -12,105 +12,100 @@
 
 @section('content')
 <div class="container-fluid mb-4">
-    <div class="card shadow-sm border-0">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-secondary">
-                Detail Purchase Request
-                
-                {{-- Cek jika $approvalRequest ada DAN tipenya 'Over Budget' --}}
-                @if(isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget')
-                    <span class="badge bg-danger ms-2">Over Budget</span>
-                @endif
-            </h5>
-            <div>
-                @if ($purchase->status === 'pending')
-                    <a href="{{ route('purchases.edit', $purchase->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
-                        <i class="bi bi-pencil-square"></i> Edit
-                    </a>
-                @endif
-
-                {{-- Status Dropdown --}}
-                <div class="btn-group">
-                    @if ($purchase->status === 'pending')
-                        <button class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
-                            <i class="bi bi-hourglass-split"></i> Pending
-                        </button>
-                        <ul class="dropdown-menu dropdown-menu-end">
-                            <li>
-                                <a href="#" class="dropdown-item approval-action" data-status="approved">
-                                    ✅ Approve
-                                </a>
-                            </li>
-                            <li>
-                                <a href="#" class="dropdown-item approval-action" data-status="rejected">
-                                    ❌ Reject
-                                </a>
-                            </li>
-                        </ul>
-                    @elseif ($purchase->status === 'approved')
-                        <button class="btn btn-sm btn-success" disabled>
-                            <i class="bi bi-check2-circle"></i> Approved
-                        </button>
-                    @elseif ($purchase->status === 'rejected')
-                        <button class="btn btn-sm btn-danger" disabled>
-                            <i class="bi bi-x-circle"></i> Rejected
-                        </button>
-                    @else
-                        <button class="btn btn-sm btn-secondary" disabled>
-                            <i class="bi bi-question-circle"></i> Unknown
-                        </button>
-                    @endif
-                </div>
-
-                <a target="_blank" href="{{ route('purchases.print', $purchase->id) }}" class="btn btn-sm btn-secondary ms-2">
-                    <i class="bi bi-printer"></i> Print
-                </a>
-            </div>
-        </div>
-
-        <div class="card-header">
-            <h5 class="mb-2 fw-bold text-secondary">Log Approval</h5>
-            
-            {{-- Jika tidak ada log sama sekali --}}
-            @if($approvalLogs->isEmpty())
-                <h6 class="text-muted my-0">Belum ada riwayat approval.</h6>
+    <div class="d-flex justify-content-between align-items-center">
+        <h3 class="mb-1 fw-semibold">Detail Purchase Request 
+            @if(isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget')
+                <span class="badge bg-danger ms-2">Over Budget</span>
             @endif
-        
-            {{-- Loop untuk log yang SUDAH DISETUJUI --}}
-            @foreach($approvalLogs->where('action', 'approved') as $log)
-                <div class_content="d-flex justify-content-between align-items-center">
-                    <h6 class="text-success my-0">
-                        <i class="bi bi-check-circle-fill"></i>
-                        Disetujui oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
-                    </h6>
-                    @if($log->comment)
-                        <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
-                    @endif
-                </div>
-            @endforeach
-        
-            {{-- Loop untuk log yang MASIH MENUNGGU --}}
-            @foreach($approvalLogs->where('action', 'assigned') as $log)
-                 <h6 class="text-warning my-0">
-                    <i class="bi bi-hourglass-split"></i>
-                    Menunggu approval dari: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
-                 </h6>
-            @endforeach
-        
-            {{-- Loop untuk log yang DITOLAK --}}
-            @foreach($approvalLogs->where('action', 'rejected') as $log)
-                 <div class_content="d-flex justify-content-between align-items-center">
-                     <h6 class="text-danger my-0">
-                        <i class="bi bi-x-circle-fill"></i>
-                        Ditolak oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
-                     </h6>
-                     @if($log->comment)
-                        <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
-                     @endif
-                 </div>
-            @endforeach
-        </div>
+        </h3>
+        <div>
+            @if ($purchase->status === 'pending')
+                <a href="{{ route('purchases.edit', $purchase->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+            @endif
 
+            {{-- Status Dropdown --}}
+            <div class="btn-group">
+                @if ($purchase->status === 'pending')
+                    <button class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
+                        <i class="bi bi-hourglass-split"></i> Pending
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li>
+                            <a href="#" class="dropdown-item approval-action" data-status="approved">
+                                ✅ Approve
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#" class="dropdown-item approval-action" data-status="rejected">
+                                ❌ Reject
+                            </a>
+                        </li>
+                    </ul>
+                @elseif ($purchase->status === 'approved')
+                    <button class="btn btn-sm btn-success" disabled>
+                        <i class="bi bi-check2-circle"></i> Approved
+                    </button>
+                @elseif ($purchase->status === 'rejected')
+                    <button class="btn btn-sm btn-danger" disabled>
+                        <i class="bi bi-x-circle"></i> Rejected
+                    </button>
+                @else
+                    <button class="btn btn-sm btn-secondary" disabled>
+                        <i class="bi bi-question-circle"></i> Unknown
+                    </button>
+                @endif
+            </div>
+
+            <a target="_blank" href="{{ route('purchases.print', $purchase->id) }}" class="btn btn-sm btn-secondary ms-2">
+                <i class="bi bi-printer"></i> Print
+            </a>
+        </div>
+    </div>
+    <div class="card-header rounded-3 mt-3">
+        <h5 class="mb-2 fw-bold text-secondary">Log Approval</h5>
+        
+        {{-- Jika tidak ada log sama sekali --}}
+        @if($approvalLogs->isEmpty())
+            <h6 class="text-muted my-0">Belum ada riwayat approval.</h6>
+        @endif
+    
+        {{-- Loop untuk log yang SUDAH DISETUJUI --}}
+        @foreach($approvalLogs->where('action', 'approved') as $log)
+            <div class_content="d-flex justify-content-between align-items-center">
+                <h6 class="text-success my-0">
+                    <i class="bi bi-check-circle-fill"></i>
+                    Disetujui oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                </h6>
+                @if($log->comment)
+                    <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
+                @endif
+            </div>
+        @endforeach
+    
+        {{-- Loop untuk log yang MASIH MENUNGGU --}}
+        @foreach($approvalLogs->where('action', 'assigned') as $log)
+             <h6 class="text-warning my-0">
+                <i class="bi bi-hourglass-split"></i>
+                Menunggu approval dari: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+             </h6>
+        @endforeach
+    
+        {{-- Loop untuk log yang DITOLAK --}}
+        @foreach($approvalLogs->where('action', 'rejected') as $log)
+             <div class_content="d-flex justify-content-between align-items-center">
+                 <h6 class="text-danger my-0">
+                    <i class="bi bi-x-circle-fill"></i>
+                    Ditolak oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                 </h6>
+                 @if($log->comment)
+                    <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
+                 @endif
+             </div>
+        @endforeach
+    </div>
+    <div class="card shadow-sm border-0 rounded-3 mt-3">
         <div class="card-body">
             <h5 class="mb-4 fw-bold text-secondary">Informasi Purchase Request:</h5>
             {{-- ==== Informasi Utama ==== --}}
