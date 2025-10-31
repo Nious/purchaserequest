@@ -131,19 +131,20 @@
                     <div class="border-bottom my-2"></div>
 
                     <div class="mt-2">
-                        <h6><span class="fw-bold">Log Approval:</span></h6>
+                        <h6><span class="fw-bold">Status Approval:</span></h6>
                         
-                        @if($status == 'pending' && $purchase->approvalRequest && $purchase->approvalRequest->logs->where('action', 'assigned')->count() > 0)
-                            @php
+                        @if($status == 'pending')
+                            {{-- @php
                                 $waitingFor = $purchase->approvalRequest->logs
                                     ->where('action', 'assigned')
                                     ->map(function($log) {
                                         return $log->approver->name ?? 'User';
                                     })->implode(', ');
-                            @endphp
+                            @endphp --}}
                             <h6 class="text-warning my-0">
                                 <i class="bi bi-hourglass-split"></i>
-                                Menunggu approval dari: <strong>{{ $waitingFor }}</strong>
+                                {{-- Menunggu approval dari: <strong>{{ $waitingFor }}</strong> --}}
+                                Masih Menunggu Approval
                             </h6>
                         @elseif($status == 'approved')
                              <h6 class="text-success my-0">

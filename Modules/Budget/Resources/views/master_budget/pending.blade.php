@@ -57,18 +57,18 @@
             </div>
 
             @if ($pendingBudgets->count() !== 0)
-            <h6 class="text-muted my-3">
-                Berhasil Menampilkan <span class="fw-semibold text-black">{{ $pendingBudgets->count() }} Data</span> Master Budget
-                @if($activeStatus != 'all')
-                    dengan status "{{ ucfirst($activeStatus) }}"
-                @endif
-                .
-            </h6>
+                <h6 class="text-muted my-3">
+                    Berhasil Menampilkan <span class="fw-semibold text-black">{{ $pendingBudgets->count() }} Data</span> Master Budget
+                    @if($activeStatus != 'all')
+                        dengan status "{{ ucfirst($activeStatus) }}"
+                    @endif
+                    .
+                </h6>
             @endif
 
             @forelse ($pendingBudgets as $budget)
                 {{-- === KODE BARU ANDA MULAI DARI SINI === --}}
-                <div class="rounded-4 p-4 card shadow-sm mb-4 border-0">
+                <div class="rounded-4 p-4 card shadow-sm mb-2 border-0">
                     <div class="d-flex justify-content-between align-items-center">
                         <div class="d-flex gap-2 align-items-center">
                             <h4 class="fw-bold mb-0">{{ $budget->no_budgeting }}</h4>
@@ -138,6 +138,16 @@
                                 <i class="bi bi-hourglass-split"></i>
                                 Menunggu approval dari: <strong>{{ $waitingFor }}</strong>
                             </h6>
+                        @elseif($status == 'approved')
+                            <h6 class="text-success my-0">
+                               <i class="bi bi-check-circle-fill"></i>
+                               Purchase Request telah disetujui.
+                           </h6>
+                        @elseif($status == 'rejected')
+                            <h6 class="text-danger my-0">
+                               <i class="bi bi-x-circle-fill"></i>
+                               Purchase Request ditolak.
+                           </h6>
                         @else
                              <h6 class="text-muted my-0">Tidak ada log approval yang menunggu.</h6>
                         @endif

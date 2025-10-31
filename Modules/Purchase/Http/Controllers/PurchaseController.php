@@ -1194,33 +1194,25 @@ class PurchaseController extends Controller
 
     public function pending(Request $request) // <-- Tambahkan Request
     {
-        // 1. (Opsional) Amankan halaman ini
-        // abort_if(Gate::denies('access_pending_purchases'), 403); 
+        $status = $request->get('status', 'pending');
 
-        // 2. Ambil status dari URL, default-nya adalah 'pending'
-        $activeStatus = $request->query('status', 'pending');
+        $pendingPurchases = Purchase::with([
+            'department',
+            'user',
+            'approvalRequest.logs.approver',
+        ])
+        ->when($status != 'all', fn($q) => $q->where('status', $status))
+        ->orderByDesc('created_at')
+        ->get();
 
-        // 3. Mulai query, muat relasi
-        $query = Purchase::with([
-            'user', 
-            'department', 
-            'purchaseDetails.product', 
-            'approvalRequest.logs.approver'
-        ]);
-
-        // 4. Terapkan filter JIKA status bukan 'all'
-        if ($activeStatus !== 'all') {
-            // Gunakan ucfirst() untuk mengubah 'pending' -> 'Pending', 'approved' -> 'Approved'
-            $query->where('status', ucfirst($activeStatus)); 
+        foreach ($pendingPurchases as $purchase) {
+            $purchase->load(['approvalRequest.logs.approver']);
         }
-        
-        // 5. Ambil data
-        $purchases = $query->orderBy('date', 'desc')->get(); // Ubah ke 'desc' agar data terbaru di atas
             
         // 6. Kirim data DAN status aktif ke view
         return view('purchase::pending', [
-            'pendingPurchases' => $purchases, // Kirim data yang sudah difilter
-            'activeStatus'   => $activeStatus  // Kirim nama status yang sedang aktif
+            'pendingPurchases' => $pendingPurchases, // Kirim data yang sudah difilter
+            'activeStatus'   => $status  // Kirim nama status yang sedang aktif
         ]);
     }
 }
