@@ -26,6 +26,7 @@ use Modules\Approval\Entities\ApprovalRuleLevel;
 use Modules\Approval\Entities\ApprovalRequestLog;
 use Modules\Approval\Entities\ApprovalRuleUser;
 use Illuminate\Support\Facades\Log;
+use PDF;
 
 class PurchaseController extends Controller
 {
@@ -1214,5 +1215,22 @@ class PurchaseController extends Controller
             'pendingPurchases' => $pendingPurchases, // Kirim data yang sudah difilter
             'activeStatus'   => $status  // Kirim nama status yang sedang aktif
         ]);
+    }
+
+    public function print($id)
+    {
+        $purchase = Purchase::findOrFail($id);
+        $supplier = null;
+        if ($purchase->supplier_id) {
+            $supplier = Supplier::find($purchase->supplier_id);
+        }
+
+        // Ini adalah cara Dompdf (sintaksnya hampir identik)
+        $pdf = PDF::loadView('purchase::print', [
+            'purchase' => $purchase,
+            'supplier' => $supplier,
+        ])->setPaper('a4', 'portrait'); // 'portrait' (opsional, tapi disarankan)
+
+        return $pdf->stream('purchase-'. $purchase->reference .'.pdf');
     }
 }
