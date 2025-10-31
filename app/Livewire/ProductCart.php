@@ -247,10 +247,10 @@ class ProductCart extends Component
     {
         $cart_item = Cart::instance($this->cart_instance)->get($row_id);
 
-        if (($this->check_quantity[$product_id] ?? 0) < ($this->quantity[$product_id] ?? 0)) {
-            session()->flash('message', 'The requested quantity is not available in stock.');
-            return;
-        }
+        // if (($this->check_quantity[$product_id] ?? 0) < ($this->quantity[$product_id] ?? 0)) {
+        //     session()->flash('message', 'The requested quantity is not available in stock.');
+        //     return;
+        // }
 
         Cart::instance($this->cart_instance)->update($row_id, $this->quantity[$product_id]);
 

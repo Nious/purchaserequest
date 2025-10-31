@@ -284,16 +284,19 @@
                             {{-- == TAMPILAN UNTUK PENDING (NORMAL) == --}}
                             {{-- =================================== --}}
                             
-                            @php $remainingAfterThisPR = $sisaBudgetSetelahPRIni; @endphp 
+                            @php 
+                            $budgetTersedia = $sisaBudgetSetelahPRIni;
+                            $sisaBudget = $budgetTersedia - $purchase->total_amount
+                            @endphp 
 
                             <tr>
                                 <th class="text-start text-muted">Budget Tersedia (Saat Ini)</th>
-                                <td class="text-end fw-bold">{{ format_currency($currentRemainingBudget) }}</td>
+                                <td class="text-end fw-bold">{{ format_currency($budgetTersedia) }}</td>
                             </tr>
                             <tr>
                                 <th class="text-start text-muted">Sisa Budget (Jika Disetujui)</th> 
-                                <td class="text-end fw-bold" style="color: {{ $remainingAfterThisPR < 0 ? 'red' : 'green' }}">
-                                    {{ format_currency($remainingAfterThisPR) }} 
+                                <td class="text-end fw-bold" style="color: {{ $sisaBudget < 0 ? 'red' : 'green' }}">
+                                    {{ format_currency($sisaBudget) }} 
                                 </td>
                             </tr>
 
