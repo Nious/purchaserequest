@@ -6,6 +6,8 @@ use Modules\Budget\Http\Controllers\MasterBudgetsController;
 
 Route::prefix('master_budget')->name('master_budget.')->group(function () {
 Route::middleware(['web', 'auth'])->group(function () {
+    Route::get('/pending', [MasterBudgetsController::class, 'pending'])->name('pending');
+
     Route::resource('master_budget', MasterBudgetsController::class);
     
     Route::get('/', [MasterBudgetsController::class, 'index'])->name('index');

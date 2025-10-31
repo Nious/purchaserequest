@@ -168,7 +168,7 @@ return [
         RealRashid\SweetAlert\SweetAlertServiceProvider::class,
         Spatie\Permission\PermissionServiceProvider::class,
         Milon\Barcode\BarcodeServiceProvider::class,
-        Barryvdh\Snappy\ServiceProvider::class,
+        // Barryvdh\Snappy\ServiceProvider::class,
         /*
          * Application Service Providers...
          */
@@ -240,8 +240,8 @@ return [
         'Alert' => RealRashid\SweetAlert\Facades\Alert::class,
         'DNS1D' => Milon\Barcode\Facades\DNS1DFacade::class,
         'DNS2D' => Milon\Barcode\Facades\DNS2DFacade::class,
-        'PDF' => Barryvdh\Snappy\Facades\SnappyPdf::class,
-        'SnappyImage' => Barryvdh\Snappy\Facades\SnappyImage::class,
+        // 'PDF' => Barryvdh\Snappy\Facades\SnappyPdf::class,
+        // 'SnappyImage' => Barryvdh\Snappy\Facades\SnappyImage::class,
     ],
 
 ];

@@ -15,6 +15,9 @@ use Modules\Purchase\Http\Controllers\PurchaseController;
 
 Route::group(['middleware' => 'auth'], function () {
 
+    Route::get('/purchases/pending', [PurchaseController::class, 'pending'])
+        ->name('purchases.pending');
+
     //Generate PDF
     Route::get('/purchases/pdf/{id}', function ($id) {
         $purchase = \Modules\Purchase\Entities\Purchase::findOrFail($id);

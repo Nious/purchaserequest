@@ -1,20 +1,44 @@
+@php
+    $imagePath = public_path('images/cover-surat.png'); 
+    $type = pathinfo($imagePath, PATHINFO_EXTENSION);
+    $data = file_get_contents($imagePath);
+    $backgroundImage = 'data:image/' . $type . ';base64,' . base64_encode($data);
+@endphp
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
     <title>Purchase Request - {{ $purchase->reference }}</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 12px; color: #333; }
+        @page { margin: 0px; }
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+    }
+
+    body { 
+        font-family: "Poppins", sans-serif; 
+        font-size: 12px; 
+        color: #333; 
+        
+        background-image: url("{{ $backgroundImage }}");
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-size: cover; 
+    }
         h2 { text-align: center; margin-bottom: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #777; padding: 6px; text-align: left; }
-        th { background-color: #f0f0f0; }
+        th { background-color: #f0f0f000; }
         .no-border { border: none !important; }
         .text-right { text-align: right; }
         .mt-2 { margin-top: 10px; }
+        .margin-a4 { padding-top: 150px; padding-left:50px; padding-right:50px; padding-bottom:50px;}
     </style>
 </head>
 <body>
+    <div class="margin-a4">
     <h2>Purchase Request</h2>
 
     <table>
@@ -28,7 +52,7 @@
         @endif
     </table>
 
-    <h4 class="mt-2">Daftar Produk</h4>
+    <h3 class="mt-2">Daftar Produk</h3>
     <table>
         <thead>
             <tr>
@@ -63,6 +87,7 @@
     <div class="mt-2">
         <p><strong>Catatan:</strong></p>
         <p>{{ $purchase->note ?? '-' }}</p>
+    </div>
     </div>
 </body>
 </html>

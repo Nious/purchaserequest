@@ -26,6 +26,7 @@ use Modules\Approval\Entities\ApprovalRuleLevel;
 use Modules\Approval\Entities\ApprovalRequestLog;
 use Modules\Approval\Entities\ApprovalRuleUser;
 use Illuminate\Support\Facades\Log;
+use PDF;
 
 class PurchaseController extends Controller
 {
@@ -1190,5 +1191,46 @@ class PurchaseController extends Controller
             // Ini adalah 'sisaBudgetSetelahPRIni' dari contoh Anda
             'remaining' => $sisaBudgetSetelahPRIni
         ];
+    }
+
+    public function pending(Request $request) // <-- Tambahkan Request
+    {
+        $status = $request->get('status', 'pending');
+
+        $pendingPurchases = Purchase::with([
+            'department',
+            'user',
+            'approvalRequest.logs.approver',
+        ])
+        ->when($status != 'all', fn($q) => $q->where('status', $status))
+        ->orderByDesc('created_at')
+        ->get();
+
+        foreach ($pendingPurchases as $purchase) {
+            $purchase->load(['approvalRequest.logs.approver']);
+        }
+            
+        // 6. Kirim data DAN status aktif ke view
+        return view('purchase::pending', [
+            'pendingPurchases' => $pendingPurchases, // Kirim data yang sudah difilter
+            'activeStatus'   => $status  // Kirim nama status yang sedang aktif
+        ]);
+    }
+
+    public function print($id)
+    {
+        $purchase = Purchase::findOrFail($id);
+        $supplier = null;
+        if ($purchase->supplier_id) {
+            $supplier = Supplier::find($purchase->supplier_id);
+        }
+
+        // Ini adalah cara Dompdf (sintaksnya hampir identik)
+        $pdf = PDF::loadView('purchase::print', [
+            'purchase' => $purchase,
+            'supplier' => $supplier,
+        ])->setPaper('a4', 'portrait'); // 'portrait' (opsional, tapi disarankan)
+
+        return $pdf->stream('purchase-'. $purchase->reference .'.pdf');
     }
 }
