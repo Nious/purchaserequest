@@ -26,31 +26,31 @@
     <div class="row">
         <div class="col-12">
             <h3 class="mb-1 fw-semibold">Daftar Master Budget</h3>
-            <div class="d-flex mt-2">
+            <div class="d-flex mt-2 overflow-x-auto">
                 {{-- Tambahkan class 'status-filter' untuk target style hover --}}
                 <div class="d-flex bg-white rounded-3 shadow status-filter">
                     
                     {{-- Tombol Pending --}}
                     <a href="{{ route('master_budget.pending', ['status' => 'pending']) }}" 
-                    class="p-2 px-4 rounded-3 {{ $activeStatus == 'pending' ? 'bg-info text-white active' : '' }}">
+                    class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'pending' ? 'bg-info text-white active' : '' }}">
                     Pending
                     </a>
                     
                     {{-- Tombol Approved --}}
                     <a href="{{ route('master_budget.pending', ['status' => 'approved']) }}" 
-                    class="p-2 px-4 rounded-3 {{ $activeStatus == 'approved' ? 'bg-info text-white active' : '' }}">
+                    class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'approved' ? 'bg-info text-white active' : '' }}">
                     Approved
                     </a>
                     
                     {{-- Tombol Rejected --}}
                     <a href="{{ route('master_budget.pending', ['status' => 'rejected']) }}" 
-                    class="p-2 px-4 rounded-3 {{ $activeStatus == 'rejected' ? 'bg-info text-white active' : '' }}">
+                    class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'rejected' ? 'bg-info text-white active' : '' }}">
                     Rejected
                     </a>
                     
                     {{-- Tombol Semua Data --}}
                     <a href="{{ route('master_budget.pending', ['status' => 'all']) }}" 
-                    class="p-2 px-4 rounded-3 {{ $activeStatus == 'all' ? 'bg-info text-white active' : '' }}">
+                    class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'all' ? 'bg-info text-white active' : '' }}">
                     Semua Data
                     </a>
                 </div>
@@ -70,7 +70,7 @@
                 {{-- === KODE BARU ANDA MULAI DARI SINI === --}}
                 <div class="rounded-4 p-4 card shadow-sm mb-2 border-0">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex gap-2 align-items-center">
+                        <div class="d-md-flex gap-2 align-items-center">
                             <h4 class="fw-bold mb-0">{{ $budget->no_budgeting }}</h4>
                             
                             {{-- 1. Badge Status Dinamis --}}
@@ -85,12 +85,15 @@
                                     $statusClass = 'bg-danger';
                                 }
                             @endphp
-                            <div class="p-1 px-4 {{ $statusClass }} text-white bg-opacity-50 rounded-2" style="font-size: 0.9em;">
-                                {{ ucfirst($status) }}
+                            <div class="d-flex">
+                                <div class="p-1 px-4 {{ $statusClass }} text-white bg-opacity-50 rounded-2" style="font-size: 0.9em;">
+                                    {{ ucfirst($status) }}
+                                </div>
                             </div>
                         
                             {{-- 2. Badge Tipe Budget Dinamis --}}
-                            @if(!$budget->department_id) {{-- Ini akan menangkap 0 atau null --}}
+                            <div class="d-flex">
+                                @if(!$budget->department_id) {{-- Ini akan menangkap 0 atau null --}}
                                 <div class="p-1 px-4 bg-danger text-white bg-opacity-50 rounded-2" style="font-size: 0.9em;">
                                     Over Budget
                                 </div>
@@ -99,9 +102,10 @@
                                     Master Budget
                                 </div>
                             @endif
+                            </div>
                         </div>
                         <a href="{{ route('master_budget.show', $budget->id) }}" class="p-2 px-4 btn btn-primary text-white rounded-2">
-                            Lihat Detail & Approve
+                            Lihat Detail
                         </a>
                     </div>
                     

@@ -12,7 +12,7 @@
 
 @section('content')
 <div class="container-fluid mb-4">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-md-flex justify-content-between align-items-center">
         <h3 class="mb-1 fw-semibold">Detail Purchase Request 
             @if(isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget')
                 <span class="badge bg-danger ms-2">Over Budget</span>

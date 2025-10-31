@@ -23,7 +23,7 @@
 
 @section('content')
 <div class="container-fluid mb-4">
-    <div class="d-flex justify-content-between align-items-center">
+    <div class="d-md-flex justify-content-between align-items-center">
         <h3 class="mb-1 fw-semibold">Detail Master Budget
             @if($budget->department_id === 0)
                 <span class="badge bg-danger ms-2">Over Budget</span>

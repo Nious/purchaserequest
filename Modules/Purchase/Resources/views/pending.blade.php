@@ -29,30 +29,30 @@
             <h3 class="mb-1 fw-semibold">Daftar Purchase Request</h3>
             
             {{-- === 1. TAMBAHKAN TOMBOL FILTER DI SINI === --}}
-            <div class="d-flex mt-2">
+            <div class="d-flex mt-2 overflow-x-auto">
                 <div class="d-flex bg-white rounded-3 shadow status-filter">
                     
                     {{-- Tombol Pending --}}
                     <a href="{{ route('purchases.pending', ['status' => 'pending']) }}" 
-                       class="p-2 px-4 rounded-3 {{ $activeStatus == 'pending' ? 'bg-info text-white active' : '' }}">
+                       class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'pending' ? 'bg-info text-white active' : '' }}">
                        Pending
                     </a>
                     
                     {{-- Tombol Approved --}}
                     <a href="{{ route('purchases.pending', ['status' => 'approved']) }}" 
-                       class="p-2 px-4 rounded-3 {{ $activeStatus == 'approved' ? 'bg-info text-white active' : '' }}">
+                       class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'approved' ? 'bg-info text-white active' : '' }}">
                        Approved
                     </a>
                     
                     {{-- Tombol Rejected --}}
                     <a href="{{ route('purchases.pending', ['status' => 'rejected']) }}" 
-                       class="p-2 px-4 rounded-3 {{ $activeStatus == 'rejected' ? 'bg-info text-white active' : '' }}">
+                       class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'rejected' ? 'bg-info text-white active' : '' }}">
                        Rejected
                     </a>
                     
                     {{-- Tombol Semua Data --}}
                     <a href="{{ route('purchases.pending', ['status' => 'all']) }}" 
-                       class="p-2 px-4 rounded-3 {{ $activeStatus == 'all' ? 'bg-info text-white active' : '' }}">
+                       class="p-2 px-4 rounded-3 text-nowrap {{ $activeStatus == 'all' ? 'bg-info text-white active' : '' }}">
                        Semua Data
                     </a>
                 </div>
@@ -73,7 +73,7 @@
             @forelse ($pendingPurchases as $purchase)
                 <div class="rounded-4 p-4 card shadow-sm mb-2 border-0">
                     <div class="d-flex justify-content-between align-items-center">
-                        <div class="d-flex gap-2 align-items-center">
+                        <div class="d-md-flex gap-2 align-items-center">
                             <h4 class="fw-bold mb-0">{{ $purchase->reference }}</h4>
                             
                             {{-- === 2. PERBAIKAN BADGE STATUS DINAMIS === --}}
@@ -88,8 +88,10 @@
                                     $statusClass = 'bg-danger';
                                 }
                             @endphp
-                            <div class="p-1 px-4 {{ $statusClass }} text-white bg-opacity-50 rounded-2" style="font-size: 0.9em;">
-                                {{ ucfirst($status) }}
+                            <div class="d-flex">
+                                <div class="p-1 px-4 {{ $statusClass }} text-white bg-opacity-50 rounded-2" style="font-size: 0.9em;">
+                                    {{ ucfirst($status) }}
+                                </div>
                             </div>
                             {{-- === BATAS PERBAIKAN === --}}
 
@@ -97,7 +99,8 @@
                                 $isOverBudget = isset($purchase->approvalRequest) && $purchase->approvalRequest->requestable_type === 'Over Budget';
                             @endphp
 
-                            @if($isOverBudget)
+                            <div class="d-flex">
+                                @if($isOverBudget)
                                 <div class="p-1 px-4 bg-danger text-white bg-opacity-50 rounded-2" style="font-size: 0.9em;">
                                     Over Budget
                                 </div>
@@ -106,6 +109,7 @@
                                     Purchase Request
                                 </div>
                             @endif
+                            </div>
                         </div>
                         
                         <a href="{{ route('purchases.show', $purchase->id) }}" class="p-2 px-4 btn btn-primary text-white rounded-2">
