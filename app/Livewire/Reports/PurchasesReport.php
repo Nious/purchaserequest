@@ -13,10 +13,10 @@ class PurchasesReport extends Component
 
     protected $paginationTheme = 'bootstrap';
 
-    public $suppliers;
+    public $departments;
     public $start_date;
     public $end_date;
-    public $supplier_id;
+    public $department_id;
     public $purchase_status;
     public $payment_status;
 
@@ -25,20 +25,20 @@ class PurchasesReport extends Component
         'end_date'   => 'required|date|after:start_date',
     ];
 
-    public function mount($suppliers) {
-        $this->suppliers = $suppliers;
+    public function mount($departments) {
+        $this->departments = $departments;
         $this->start_date = today()->subDays(30)->format('Y-m-d');
         $this->end_date = today()->format('Y-m-d');
-        $this->supplier_id = '';
+        $this->departement_id = '';
         $this->purchase_status = '';
         $this->payment_status = '';
     }
 
     public function render() {
-        $purchases = Purchase::whereDate('date', '>=', $this->start_date)
+        $purchases = Purchase::with('department')
             ->whereDate('date', '<=', $this->end_date)
-            ->when($this->supplier_id, function ($query) {
-                return $query->where('supplier_id', $this->supplier_id);
+            ->when($this->department_id, function ($query) {
+                return $query->where('department_id', $this->department_id);
             })
             ->when($this->purchase_status, function ($query) {
                 return $query->where('status', $this->purchase_status);

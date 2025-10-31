@@ -1,11 +1,11 @@
 <div>
     <div class="row">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
+            <div class="card border-0 rounded-3 shadow-sm">
                 <div class="card-body">
                     <form wire:submit="generateReport">
                         <div class="form-row">
-                            <div class="col-lg-4">
+                            <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>Start Date <span class="text-danger">*</span></label>
                                     <input wire:model="start_date" type="date" class="form-control" name="start_date">
@@ -14,7 +14,7 @@
                                     @enderror
                                 </div>
                             </div>
-                            <div class="col-lg-4">
+                            <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>End Date <span class="text-danger">*</span></label>
                                     <input wire:model="end_date" type="date" class="form-control" name="end_date">
@@ -23,38 +23,28 @@
                                     @enderror
                                 </div>
                             </div>
-                            <div class="col-lg-4">
+                        </div>
+                        <div class="form-row">
+                            <div class="col-lg-6">
                                 <div class="form-group">
-                                    <label>Supplier</label>
-                                    <select wire:model="supplier_id" class="form-control" name="supplier_id">
-                                        <option value="">Select Supplier</option>
-                                        @foreach($suppliers as $supplier)
-                                            <option value="{{ $supplier->id }}">{{ $supplier->supplier_name }}</option>
+                                    <label>Departemen</label>
+                                    
+                                    <select wire:model="department_id" class="form-control" name="department_id">
+                                        <option value="">Select Departement</option>
+                                        @foreach($departments as $department)
+                                            <option value="{{ $department->id }}">{{ $department->department_name }}</option>
                                         @endforeach
                                     </select>
                                 </div>
                             </div>
-                        </div>
-                        <div class="form-row">
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>Status</label>
                                     <select wire:model="purchase_status" class="form-control" name="purchase_status">
                                         <option value="">Select Status</option>
                                         <option value="Pending">Pending</option>
-                                        <option value="Ordered">Ordered</option>
-                                        <option value="Completed">Completed</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="col-lg-6">
-                                <div class="form-group">
-                                    <label>Payment Status</label>
-                                    <select wire:model="payment_status" class="form-control" name="payment_status">
-                                        <option value="">Select Payment Status</option>
-                                        <option value="Paid">Paid</option>
-                                        <option value="Unpaid">Unpaid</option>
-                                        <option value="Partial">Partial</option>
+                                        <option value="Approved">Approve</option>
+                                        <option value="Rejected">Reject</option>
                                     </select>
                                 </div>
                             </div>
@@ -74,7 +64,7 @@
 
     <div class="row">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
+            <div class="card border-0 rounded-3 shadow-sm">
                 <div class="card-body">
                     <table class="table table-bordered table-striped text-center mb-0">
                         <div wire:loading.flex class="col-12 position-absolute justify-content-center align-items-center" style="top:0;right:0;left:0;bottom:0;background-color: rgba(255,255,255,0.5);z-index: 99;">
@@ -86,7 +76,7 @@
                         <tr>
                             <th>Date</th>
                             <th>Reference</th>
-                            <th>Supplier</th>
+                            <th>Departement</th>
                             <th>Status</th>
                             <th>Total</th>
                             <th>Paid</th>
@@ -99,18 +89,18 @@
                             <tr>
                                 <td>{{ \Carbon\Carbon::parse($purchase->date)->format('d M, Y') }}</td>
                                 <td>{{ $purchase->reference }}</td>
-                                <td>{{ $purchase->supplier_name }}</td>
+                                <td>{{ $purchase->department->department_name ?? 'N/A' }}</td>
                                 <td>
-                                    @if ($purchase->status == 'Pending')
-                                        <span class="badge badge-info">
+                                    @if ($purchase->status == 'pending')
+                                        <span class="badge badge-warning">
                                     {{ $purchase->status }}
                                 </span>
-                                    @elseif ($purchase->status == 'Ordered')
-                                        <span class="badge badge-primary">
+                                    @elseif ($purchase->status == 'approved')
+                                        <span class="badge badge-success">
                                     {{ $purchase->status }}
                                 </span>
                                     @else
-                                        <span class="badge badge-success">
+                                        <span class="badge badge-danger">
                                     {{ $purchase->status }}
                                 </span>
                                     @endif
