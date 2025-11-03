@@ -469,8 +469,12 @@ class MasterBudgetsController extends Controller
 
         // 4. Jika user bukan admin (department_id ≠ 0)
         if ($user->department_id != 0) {
+            $query->where(function ($q) use ($user) {
+                $q->where('department_id', $user->department_id)
+                  ->orWhere('department_id', 0);
+            });
             // Hanya tampilkan data milik departemennya
-            $query->where('department_id', $user->department_id);
+            // $query->where('department_id', $user->department_id);
         }
 
         // 5. Terapkan filter status (jika bukan 'all')

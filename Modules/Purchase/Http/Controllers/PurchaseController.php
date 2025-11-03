@@ -1193,27 +1193,36 @@ class PurchaseController extends Controller
         ];
     }
 
-    public function pending(Request $request) // <-- Tambahkan Request
+    public function pending(Request $request)
     {
         $status = $request->get('status', 'pending');
 
-        $pendingPurchases = Purchase::with([
-            'department',
-            'user',
-            'approvalRequest.logs.approver',
-        ])
-        ->when($status != 'all', fn($q) => $q->where('status', $status))
-        ->orderByDesc('created_at')
-        ->get();
+        $user = auth()->user();
 
-        foreach ($pendingPurchases as $purchase) {
-            $purchase->load(['approvalRequest.logs.approver']);
-        }
-            
-        // 6. Kirim data DAN status aktif ke view
+        $pendingPurchases = Purchase::with([
+                'department',
+                'user',
+                'approvalRequest.logs.approver',
+            ])
+            // 🔹 Jika user bukan admin (department_id ≠ 0)
+            ->when($user->department_id != 0, function ($query) use ($user) {
+                // Hanya tampilkan data milik departemennya
+                // $query->where('department_id', $user->department_id);
+                $query->where(function ($q) use ($user) {
+                    $q->where('department_id', $user->department_id)
+                      ->orWhere('department_id', 0);
+                });
+            })
+            // 🔹 Filter status (jika bukan 'all')
+            ->when($status != 'all', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->orderByDesc('created_at')
+            ->get();
+
         return view('purchase::pending', [
-            'pendingPurchases' => $pendingPurchases, // Kirim data yang sudah difilter
-            'activeStatus'   => $status  // Kirim nama status yang sedang aktif
+            'pendingPurchases' => $pendingPurchases,
+            'activeStatus'     => $status,
         ]);
     }
 
