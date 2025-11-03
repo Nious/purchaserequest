@@ -60,12 +60,22 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="form-group mb-0">
-                            <button type="submit" class="btn btn-primary">
-                                <span wire:target="generateReport" wire:loading class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                                <i wire:target="generateReport" wire:loading.remove class="bi bi-shuffle"></i>
-                                Filter Report
-                            </button>
+                        <div class="d-flex justify-content-between">
+                            <div class="form-group mb-0">
+                                <button type="submit" class="btn btn-primary">
+                                    <span wire:target="generateReport" wire:loading class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    <i wire:target="generateReport" wire:loading.remove class="bi bi-shuffle"></i>
+                                    Filter Report
+                                </button>
+                            </div>
+                            <div class="form-group mb-0">
+                                {{-- Ganti type="submit" menjadi type="button" dan tambahkan wire:click --}}
+                                <button type="button" wire:click="printReport" class="btn btn-secondary">
+                                    <span wire:target="printReport" wire:loading class="spinner-border spinner-border-sm"></span>
+                                    <i wire:target="printReport" wire:loading.remove class="bi bi-printer"></i>
+                                    Print Report
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -103,15 +113,15 @@
                                 <td>
                                     @if ($purchase->status == 'pending')
                                         <span class="badge badge-warning">
-                                    {{ $purchase->status }}
+                                    {{ ucfirst($purchase->status) }}
                                 </span>
                                     @elseif ($purchase->status == 'approved')
                                         <span class="badge badge-success">
-                                    {{ $purchase->status }}
+                                    {{ ucfirst($purchase->status) }}
                                 </span>
                                     @else
                                         <span class="badge badge-danger">
-                                    {{ $purchase->status }}
+                                    {{ ucfirst($purchase->status) }}
                                 </span>
                                     @endif
                                 </td>

@@ -81,4 +81,27 @@ class PurchasesReport extends Component
         $this->validate();
         $this->render();
     }
+
+    public function printReport()
+    {
+        // Validasi tanggal
+        $this->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+        ]);
+        
+        // Buat query string dari filter saat ini
+        $queryParams = http_build_query([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'department_id' => $this->department_id,
+            'purchase_status' => $this->purchase_status,
+        ]);
+
+        // Buat URL lengkap ke rute print
+        $url = route('reports.purchases.print') . '?' . $queryParams;
+
+        // Redirect pengguna ke URL tersebut di tab baru
+        return redirect()->to($url);
+    }
 }
