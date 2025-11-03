@@ -71,9 +71,9 @@
         </div>
     </div>
 
-    <div class="row mt-4">
+    <div class="row mt-2">
         <div class="col-12">
-            <div class="card border-0 shadow-sm">
+            <div class="card border-0 rounded-3 shadow-sm">
                 <div class="card-body position-relative">
                     <div wire:loading.flex class="position-absolute w-100 h-100 justify-content-center align-items-center" style="top:0;background-color: rgba(255,255,255,0.5);z-index: 99;">
                         <div class="spinner-border text-primary" role="status">
