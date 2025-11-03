@@ -96,7 +96,7 @@
                                 <th>Tgl. Penyusunan</th>
                                 <th>No. Budgeting</th>
                                 <th>Departemen</th>
-                                <th>Tipe Budget</th>
+                                {{-- <th>Tipe Budget</th> --}}
                                 <th>Bulan</th>
                                 <th>Status</th>
                                 <th class="text-end">Nilai Budgeting</th>
@@ -129,13 +129,13 @@
                                     <td>{{ \Carbon\Carbon::parse($budget->tgl_penyusunan)->format('d M, Y') }}</td>
                                     <td>{{ $budget->no_budgeting }}</td>
                                     <td>{{ $budget->department->department_name ?? ($budget->department_id == 0 ? 'All Departemen' : 'N/A') }}</td>
-                                    <td>
+                                    {{-- <td>
                                         @if($budget->department_id == 0)
                                             <span class="badge bg-danger">Over Budget</span>
                                         @else
                                             <span class="badge bg-info">Budget Utama</span>
                                         @endif
-                                    </td>
+                                    </td> --}}
                                     <td>{{ \Carbon\Carbon::create()->month($budget->bulan)->format('F') }}</td>
                                     <td>
                                         @php $status = strtolower($budget->status); @endphp
