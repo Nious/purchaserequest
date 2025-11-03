@@ -36,46 +36,70 @@ class MasterBudgetReport extends Component
         $this->resetPage();
     }
 
+    public function printReport()
+    {
+        // 1. Validasi tanggal
+        $this->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after_or_equal:start_date',
+        ]);
+        
+        // 2. Buat query string dari filter saat ini
+        $queryParams = http_build_query([
+            'start_date' => $this->start_date,
+            'end_date' => $this->end_date,
+            'department_id' => $this->department_id,
+            'status' => $this->status,
+        ]);
+
+        // 3. Buat URL lengkap ke rute print
+        $url = route('reports.master_budget.print') . '?' . $queryParams;
+
+        // 4. Kirim event ke browser untuk membuka tab baru
+        $this->dispatch('open-new-tab', $url);
+    }
+
     public function render()
-{
-    $query = MasterBudget::with('department')
-        ->whereBetween('tgl_penyusunan', [$this->start_date, $this->end_date]);
+    {
+        $query = MasterBudget::with('department')
+            ->whereBetween('tgl_penyusunan', [$this->start_date, $this->end_date]);
 
-    $userDept = auth()->user()->department_id;
+        $userDept = auth()->user()->department_id;
 
-    // 🔹 Jika user bukan admin (department_id ≠ 0)
-    if ($userDept != 0) {
-        // Tampilkan budget milik departemennya sendiri + yang department_id == 0
-        $query->where(function ($q) use ($userDept) {
-            $q->where('department_id', $userDept)
-              ->orWhere('department_id', 0);
-        });
-    } else {
-        // 🔹 Jika admin (department_id == 0)
-        // Filter berdasarkan dropdown (jika dipilih)
-        if ($this->department_id !== '' && $this->department_id !== null) {
-            if ($this->department_id == 0) {
-                // Tampilkan hanya yang 0 (All Departemen)
-                $query->where('department_id', 0);
-            } else {
-                // Tampilkan departemen tertentu + budget umum
-                $query->where(function ($q) {
-                    $q->where('department_id', $this->department_id)
-                      ->orWhere('department_id', 0);
-                });
+        // 🔹 Jika user bukan admin (department_id ≠ 0)
+        if ($userDept != 0) {
+            // Tampilkan budget milik departemennya sendiri + yang department_id == 0
+            $query->where(function ($q) use ($userDept) {
+                $q->where('department_id', $userDept)
+                ->orWhere('department_id', 0);
+            });
+        } else {
+            // 🔹 Jika admin (department_id == 0)
+            // Filter berdasarkan dropdown (jika dipilih)
+            if ($this->department_id !== '' && $this->department_id !== null) {
+                if ($this->department_id == 0) {
+                    // Tampilkan hanya yang 0 (All Departemen)
+                    $query->where('department_id', 0);
+                } else {
+                    // Tampilkan departemen tertentu + budget umum
+                    $query->where(function ($q) {
+                        $q->where('department_id', $this->department_id)
+                        ->orWhere('department_id', 0);
+                    });
+                }
             }
         }
+
+        // 🔹 Filter status
+        if ($this->status) {
+            $query->where('status', $this->status);
+        }
+
+        $masterBudgets = $query->paginate(10);
+
+        return view('livewire.reports.master-budget-report', [
+            'masterBudgets' => $masterBudgets
+        ]);
     }
 
-    // 🔹 Filter status
-    if ($this->status) {
-        $query->where('status', $this->status);
-    }
-
-    $masterBudgets = $query->paginate(10);
-
-    return view('livewire.reports.master-budget-report', [
-        'masterBudgets' => $masterBudgets
-    ]);
-}
 }

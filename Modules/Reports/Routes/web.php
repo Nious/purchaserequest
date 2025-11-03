@@ -10,6 +10,7 @@
 | contains the "web" middleware group. Now create something great!
 |
 */
+use Modules\Reports\Http\Controllers\ReportsController;
 
 Route::group(['middleware' => 'auth'], function () {
     //Profit Loss Report
@@ -29,6 +30,8 @@ Route::group(['middleware' => 'auth'], function () {
     //Budget Report
     Route::get('/budget-report', 'ReportsController@budgetReport')
     ->name('master-budget-report.index');
+    Route::get('/budget-report/print', [ReportsController::class, 'printBudgetReport'])
+        ->name('reports.master_budget.print');
     //Sales Return Report
     Route::get('/sales-return-report', 'ReportsController@salesReturnReport')
         ->name('sales-return-report.index');

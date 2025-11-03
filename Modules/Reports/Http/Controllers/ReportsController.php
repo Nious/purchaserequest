@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Gate;
 use Modules\Purchase\Entities\Purchase;
+use Modules\Budget\Entities\MasterBudget;
+use Modules\Reports\Http\Controllers\ReportsController;
 use PDF;
 
 class ReportsController extends Controller
@@ -94,12 +96,85 @@ class ReportsController extends Controller
         return $pdf->stream($fileName);
     }
 
-
     public function budgetReport()
     {
         abort_if(Gate::denies('access_reports'), 403);
 
         return view('reports::budgets.index');
+    }
+
+    public function printBudgetReport(Request $request)
+    {
+        abort_if(Gate::denies('access_reports'), 403);
+
+        // Ambil filter dari parameter URL
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
+        $departmentId = $request->query('department_id');
+        $status = $request->query('status');
+
+        // Query utama
+        $query = MasterBudget::with(['department', 'purchases'])
+            ->whereBetween('tgl_penyusunan', [$startDate, $endDate]);
+
+        // Filter departemen sesuai hak akses user
+        $userDeptId = auth()->user()->department_id;
+
+        if ($userDeptId != 0) {
+            // User biasa hanya lihat departemennya + Over Budget (0)
+            $query->where(function($q) use ($userDeptId) {
+                $q->where('department_id', $userDeptId)
+                ->orWhere('department_id', 0);
+            });
+            $departmentName = auth()->user()->department->department_name ?? 'Unknown Department';
+        } elseif ($departmentId) {
+            if ($departmentId == '0') {
+                $query->where('department_id', 0);
+                $departmentName = 'All Departemen';
+            } else {
+                $query->where(function($q) use ($departmentId) {
+                    $q->where('department_id', $departmentId)
+                    ->orWhere('department_id', 0);
+                });
+                $departmentName = optional(\Modules\Department\Entities\Departments::find($departmentId))->department_name ?? 'Unknown Department';
+            }
+        } else {
+            $departmentName = 'All Departemen';
+        }
+
+        // Filter status
+        if ($status) {
+            $query->where('status', $status);
+        }
+
+        // Ambil data
+        $masterBudgets = $query->orderBy('tgl_penyusunan', 'desc')->get();
+
+        // Format tanggal untuk nama file
+        $formattedStart = \Carbon\Carbon::parse($startDate)->translatedFormat('j M Y');
+        $formattedEnd = \Carbon\Carbon::parse($endDate)->translatedFormat('j M Y');
+
+        // Nama file dinamis
+        $fileName = sprintf(
+            'Budget-Report-%s-(%s - %s).pdf',
+            $departmentName,
+            $formattedStart,
+            $formattedEnd
+        );
+
+        // Generate PDF
+        $pdf = PDF::loadView('reports::budgets.print', [
+            'masterBudgets' => $masterBudgets,
+            'startDate' => $startDate,
+            'endDate' => $endDate,
+            'departmentName' => $departmentName
+        ])->setPaper('a4', 'portrait')
+        ->setOption('margin-top', 0)
+        ->setOption('margin-right', 0)
+        ->setOption('margin-bottom', 0)
+        ->setOption('margin-left', 0);
+
+        return $pdf->stream($fileName);
     }
 
     public function salesReturnReport() {

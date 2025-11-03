@@ -58,12 +58,21 @@
                             </div>
                         </div>
 
-                        <div class="form-group mb-0">
-                            <button type="submit" class="btn btn-primary">
-                                <span wire:target="generateReport" wire:loading class="spinner-border spinner-border-sm"></span>
-                                <i wire:target="generateReport" wire:loading.remove class="bi bi-shuffle"></i>
-                                Filter Report
-                            </button>
+                        <div class="d-flex justify-content-between">
+                            <div class="form-group mb-0">
+                                <button type="submit" class="btn btn-primary">
+                                    <span wire:target="generateReport" wire:loading class="spinner-border spinner-border-sm"></span>
+                                    <i wire:target="generateReport" wire:loading.remove class="bi bi-shuffle"></i>
+                                    Filter Report
+                                </button>
+                            </div>
+                            <div class="form-group mb-0">
+                                <button type="button" wire:click="printReport" class="btn btn-secondary">
+                                    <span wire:target="printReport" wire:loading class="spinner-border spinner-border-sm"></span>
+                                    <i wire:target="printReport" wire:loading.remove class="bi bi-printer"></i>
+                                    Print Report
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>
@@ -165,3 +174,18 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+    // Pastikan ini berjalan setelah Livewire siap
+    document.addEventListener('livewire:init', () => {
+        
+        // Dengarkan event 'open-new-tab' yang dikirim dari method printReport()
+        Livewire.on('open-new-tab', (url) => {
+            
+            // Buka URL (rute print PDF) di tab browser baru
+            window.open(url, '_blank');
+        });
+    });
+</script>
+@endpush
