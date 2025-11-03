@@ -5,6 +5,7 @@ namespace App\Livewire\Reports;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Modules\Purchase\Entities\Purchase;
+use Modules\Department\Entities\Departments;
 
 class PurchasesReport extends Component
 {
@@ -25,31 +26,54 @@ class PurchasesReport extends Component
         'end_date'   => 'required|date|after:start_date',
     ];
 
-    public function mount($departments) {
+    public function mount($departments)
+    {
+        $user = auth()->user();
+
         $this->departments = $departments;
         $this->start_date = today()->subDays(30)->format('Y-m-d');
         $this->end_date = today()->format('Y-m-d');
-        $this->departement_id = '';
+        $this->department_id = ''; // fix typo (tadi kamu pakai `$this->departement_id`)
         $this->purchase_status = '';
         $this->payment_status = '';
+
+        // 🔒 Jika user bukan admin, kunci department_id ke miliknya
+        if ($user->department_id != 0) {
+            $this->department_id = $user->department_id;
+        }
     }
 
-    public function render() {
-        $purchases = Purchase::with('department')
+    public function render()
+    {
+        $user = auth()->user();
+
+        $query = Purchase::with('department')
             ->whereDate('date', '<=', $this->end_date)
-            ->when($this->department_id, function ($query) {
-                return $query->where('department_id', $this->department_id);
-            })
-            ->when($this->purchase_status, function ($query) {
-                return $query->where('status', $this->purchase_status);
-            })
-            ->when($this->payment_status, function ($query) {
-                return $query->where('payment_status', $this->payment_status);
-            })
-            ->orderBy('date', 'desc')->paginate(10);
+            ->whereDate('date', '>=', $this->start_date);
+
+        // 🔒 Filter departemen berdasarkan user login
+        if ($user->department_id != 0) {
+            // Jika user punya department_id tertentu, hanya tampilkan miliknya
+            $query->where('department_id', $user->department_id);
+        } elseif ($this->department_id) {
+            // Jika admin memilih departemen tertentu
+            $query->where('department_id', $this->department_id);
+        }
+
+        // Filter status pembelian
+        if ($this->purchase_status) {
+            $query->where('status', $this->purchase_status);
+        }
+
+        // Filter status pembayaran
+        if ($this->payment_status) {
+            $query->where('payment_status', $this->payment_status);
+        }
+
+        $purchases = $query->orderBy('date', 'desc')->paginate(10);
 
         return view('livewire.reports.purchases-report', [
-            'purchases' => $purchases
+            'purchases' => $purchases,
         ]);
     }
 

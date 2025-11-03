@@ -28,15 +28,26 @@
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>Departemen</label>
-                                    
-                                    <select wire:model="department_id" class="form-control" name="department_id">
-                                        <option value="">Select Departement</option>
-                                        @foreach($departments as $department)
-                                            <option value="{{ $department->id }}">{{ $department->department_name }}</option>
-                                        @endforeach
-                                    </select>
+                            
+                                    @if(auth()->user()->department_id == 0)
+                                        <!-- Jika department_id user == 0, tampilkan semua departemen -->
+                                        <select wire:model="department_id" class="form-control" name="department_id">
+                                            <option value="">Select Departement</option>
+                                            @foreach($departments as $department)
+                                                <option value="{{ $department->id }}">{{ $department->department_name }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <!-- Jika bukan 0, hanya tampilkan departemen user yang login -->
+                                        <input type="text" 
+                                               class="form-control" 
+                                               value="{{ auth()->user()->department->department_name ?? 'N/A' }}" 
+                                               disabled>
+                                        <!-- Hidden input agar Livewire tetap tahu department_id -->
+                                        <input type="hidden" wire:model="department_id" value="{{ auth()->user()->department_id }}">
+                                    @endif
                                 </div>
-                            </div>
+                            </div>                            
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>Status</label>
@@ -81,7 +92,6 @@
                             <th>Total</th>
                             <th>Paid</th>
                             <th>Due</th>
-                            <th>Payment Status</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -108,22 +118,6 @@
                                 <td>{{ format_currency($purchase->total_amount) }}</td>
                                 <td>{{ format_currency($purchase->paid_amount) }}</td>
                                 <td>{{ format_currency($purchase->due_amount) }}</td>
-                                <td>
-                                    @if ($purchase->payment_status == 'Partial')
-                                        <span class="badge badge-warning">
-                                    {{ $purchase->payment_status }}
-                                </span>
-                                    @elseif ($purchase->payment_status == 'Paid')
-                                        <span class="badge badge-success">
-                                    {{ $purchase->payment_status }}
-                                </span>
-                                    @else
-                                        <span class="badge badge-danger">
-                                    {{ $purchase->payment_status }}
-                                </span>
-                                    @endif
-
-                                </td>
                             </tr>
                         @empty
                             <tr>
