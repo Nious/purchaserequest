@@ -33,6 +33,13 @@ class ReportsController extends Controller
         return view('reports::purchases.index');
     }
 
+    public function budgetReport()
+    {
+        abort_if(Gate::denies('access_reports'), 403);
+
+        return view('reports::budgets.index');
+    }
+
     public function salesReturnReport() {
         abort_if(Gate::denies('access_reports'), 403);
 
