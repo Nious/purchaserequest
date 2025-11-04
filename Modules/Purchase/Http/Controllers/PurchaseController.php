@@ -1002,6 +1002,7 @@ class PurchaseController extends Controller
         // --- Inisialisasi Variabel ---
         $currentRemainingBudget = 0; // Ini akan menjadi Total Alokasi Budget Dept
         $sisaBudgetSetelahPRIni = 0; // Ini akan menjadi Sisa Budget Dept Saat Ini
+        $sisaBudgetTanpaReserved = 0;
         $saldoOverBudget = 0;         // Ini akan menjadi Sisa Budget Non-Dept
         $purchaseDateObj = null;
         $month = null;
@@ -1031,9 +1032,13 @@ class PurchaseController extends Controller
                                 ->where('status', 'Approved') 
                                 ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used, SUM(reserved_amount) as total_reserved')
                                 ->first();
+
+            $totalAlokasi = $result->total_budget ?? 0;
             
             $currentRemainingBudget = $result->total_budget ?? 0; // Total Alokasi Dept
             $sisaBudgetSetelahPRIni = $currentRemainingBudget - ($result->total_used ?? 0) - ($result->total_reserved ?? 0); // Sisa Budget Dept Saat Ini
+
+            $sisaBudgetTanpaReserved = $totalAlokasi - ($result->total_used ?? 0);
 
             // 2. Jika ini Over Budget, ambil juga data Budget Non-Departemen
             if (isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget') {
@@ -1053,6 +1058,7 @@ class PurchaseController extends Controller
             'purchase', 
             'currentRemainingBudget', 
             'sisaBudgetSetelahPRIni',
+            'sisaBudgetTanpaReserved',
             'approvalLogs',
             'approvalRequest', // Kirim request utama
             'saldoOverBudget'    // Kirim sisa budget non-dept

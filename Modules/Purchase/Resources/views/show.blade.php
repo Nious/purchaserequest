@@ -215,107 +215,116 @@
                 <div class="card-body table-responsive">
                     <h5 class="fw-bold mb-3 text-dark">Budget Summary</h5>
 
-                    @php 
+                    @php
                         $status = strtolower($purchase->status); 
-                        // Cek apakah request ini TIPE-nya Over Budget
                         $isOverBudget = isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget';
                     @endphp
 
                     <table class="table table-striped">
-                        {{-- Tampilkan Grand Total (selalu sama) --}}
+                        {{-- Grand Total selalu tampil --}}
                         <tr>
                             <th class="text-start text-muted">Grand Total PR Ini</th>
                             <td class="text-end fw-bold">{{ format_currency($purchase->total_amount) }}</td>
                         </tr>
 
-                        @if ($isOverBudget)
-                            {{-- =================================== --}}
-                            {{-- == TAMPILAN KHUSUS UNTUK OVER BUDGET == --}}
-                            {{-- =================================== --}}
-                            
+                        {{-- 
+                        ================================================
+                        1. LOGIKA UNTUK SEMUA YANG STATUSNYA "PENDING"
+                        ================================================
+                        --}}
+                        @if ($status === 'pending')
+
                             @php
-                                // Ambil snapshot budget departemen (misal: 1.800.000)
-                                $budgetDeptTersedia = $purchase->master_budget_value ?? 0; 
-                                
-                                // Ambil nilai over budget (misal: -250.000)
-                                $overageAmount = $purchase->master_budget_remaining ?? 0;
-                                $sisaMB = $saldoOverBudget - abs($overageAmount);
-                                
-                                // Hitung sisa budget departemen (misal: 0)
-                                // Rumus: 1.800.000 - (2.050.000 - 250.000) = 0
-                                $sisaBudgetDept = $budgetDeptTersedia - ($purchase->total_amount - abs($overageAmount));
+                                // Ini adalah perhitungan "live" (grandtotal - used_amount)
+                                // yang Anda minta di Controller: $sisaBudgetTanpaReserved
+                                $budgetTersedia = $sisaBudgetTanpaReserved;
                             @endphp
 
-                            <tr>
-                                <th class="text-start text-muted">Budget {{ optional($purchase->department)->department_name ?? '-' }} (Tersedia)</th>
-                                <td class="text-end fw-bold">
-                                    {{ format_currency($budgetDeptTersedia) }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-start text-muted">Sisa Budget {{ optional($purchase->department)->department_name ?? '-' }}</th>
-                                <td class="text-end fw-bold">
-                                    {{ format_currency($sisaBudgetDept) }} {{-- Harusnya 0 --}}
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-start text-muted">Over Budget (Diajukan)</th>
-                                <td class="text-end fw-bold text-danger">
-                                    {{ format_currency(abs($overageAmount)) }}
-                                </td>
-                            </tr>
-                            @if ($purchase->status === 'pending')
-                            <tr>
-                                <th class="text-start text-muted">Saldo Over Budget (Saat Ini)</th>
-                                <td class="text-end fw-bold" style="color: {{ $saldoOverBudget < 0 ? 'red' : 'green' }}">
-                                    {{ format_currency($saldoOverBudget) }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-start text-muted">Sisa Over Budget</th>
-                                <td class="text-end fw-bold">
-                                    {{ format_currency($sisaMB) }}
-                                </td>
-                            </tr>
+                            @if ($isOverBudget)
+                                {{-- 1A. Tampilan PENDING (Over Budget) --}}
+                                @php
+                                    $overBudgetDiajukan = $purchase->total_amount - $budgetTersedia;
+                                    $sisaSaldoOverBudget = $saldoOverBudget - $overBudgetDiajukan;
+                                @endphp
+                                <tr>
+                                    <th class="text-start text-muted">Budget Dept (Tersedia)</th>
+                                    <td class="text-end fw-bold">{{ format_currency($budgetTersedia) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Over Budget (Diajukan)</th>
+                                    <td class="text-end fw-bold text-danger">{{ format_currency($overBudgetDiajukan) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Saldo Over Budget (Saat Ini)</th>
+                                    <td class="text-end fw-bold">{{ format_currency($saldoOverBudget) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Sisa Saldo Over Budget</th>
+                                    <td class="text-end fw-bold" style="color: {{ $sisaSaldoOverBudget < 0 ? 'red' : 'green' }}">
+                                        {{ format_currency($sisaSaldoOverBudget) }}
+                                    </td>
+                                </tr>
+
+                            @else
+                                {{-- 1B. Tampilan PENDING (Normal) --}}
+                                @php
+                                    $sisaBudget = $budgetTersedia - $purchase->total_amount;
+                                @endphp
+                                <tr>
+                                    <th class="text-start text-muted">Budget Tersedia (Saat Ini)</th>
+                                    <td class="text-end fw-bold">{{ format_currency($budgetTersedia) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Over Budget (Diajukan)</th> 
+                                    <td class="text-end fw-bold" style="color: {{ $sisaBudget < 0 ? 'red' : 'green' }}">
+                                        {{ format_currency($sisaBudget) }} 
+                                    </td>
+                                </tr>
                             @endif
 
-                        @elseif ($status === 'pending')
-                            {{-- =================================== --}}
-                            {{-- == TAMPILAN UNTUK PENDING (NORMAL) == --}}
-                            {{-- =================================== --}}
-                            
-                            @php 
-                            $budgetTersedia = $sisaBudgetSetelahPRIni;
-                            $sisaBudget = $budgetTersedia - $purchase->total_amount
-                            @endphp 
-
-                            <tr>
-                                <th class="text-start text-muted">Budget Tersedia (Saat Ini)</th>
-                                <td class="text-end fw-bold">{{ format_currency($budgetTersedia) }}</td>
-                            </tr>
-                            <tr>
-                                <th class="text-start text-muted">Sisa Budget (Jika Disetujui)</th> 
-                                <td class="text-end fw-bold" style="color: {{ $sisaBudget < 0 ? 'red' : 'green' }}">
-                                    {{ format_currency($sisaBudget) }} 
-                                </td>
-                            </tr>
-
+                        {{-- 
+                        ============================================================
+                        2. LOGIKA UNTUK SEMUA YANG STATUSNYA "FINAL" (Approved/Rejected)
+                        ============================================================
+                        --}}
                         @else
-                            {{-- ============================================ --}}
-                            {{-- == TAMPILAN FINAL (APPROVED/REJECTED NORMAL) == --}}
-                            {{-- ============================================ --}}
-                            <tr>
-                                <th class="text-start text-muted">Budget Tersedia (Saat Diproses)</th>
-                                <td class="text-end fw-bold">
-                                    {{ format_currency($purchase->master_budget_value ?? 0) }}
-                                </td>
-                            </tr>
-                            <tr>
-                                <th class="text-start text-muted">Sisa Budget (Saat Diproses)</th>
-                                <td class="text-end fw-bold {{ ($purchase->master_budget_remaining ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
-                                    {{ format_currency($purchase->master_budget_remaining ?? 0) }}
-                                </td>
-                            </tr>
+                            
+                            @if ($isOverBudget)
+                                {{-- 2A. Tampilan FINAL (Over Budget) --}}
+                                @php
+                                    $budgetDeptTersedia = $purchase->master_budget_value ?? 0; 
+                                    $overageAmount = $purchase->master_budget_remaining ?? 0;
+                                    $sisaBudgetDept = $budgetDeptTersedia - ($purchase->total_amount - abs($overageAmount));
+                                @endphp
+                                <tr>
+                                    <th class="text-start text-muted">Budget Dept (Saat Diproses)</th>
+                                    <td class="text-end fw-bold">{{ format_currency($budgetDeptTersedia) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Sisa Budget Dept</th>
+                                    <td class="text-end fw-bold">{{ format_currency($sisaBudgetDept) }}</td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Over Budget (Disetujui)</th>
+                                    <td class="text-end fw-bold text-danger">{{ format_currency(abs($overageAmount)) }}</td>
+                                </tr>
+
+                            @else
+                                {{-- 2B. Tampilan FINAL (Normal) --}}
+                                <tr>
+                                    <th class="text-start text-muted">Budget Tersedia (Saat Diproses)</th>
+                                    <td class="text-end fw-bold">
+                                        {{ format_currency($purchase->master_budget_value ?? 0) }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th class="text-start text-muted">Sisa Budget (Saat Diproses)</th>
+                                    <td class="text-end fw-bold {{ ($purchase->master_budget_remaining ?? 0) < 0 ? 'text-danger' : 'text-success' }}">
+                                        {{ format_currency($purchase->master_budget_remaining ?? 0) }}
+                                    </td>
+                                </tr>
+                            @endif
+                            
                         @endif
 
                     </table>
