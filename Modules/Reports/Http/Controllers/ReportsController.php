@@ -113,68 +113,57 @@ class ReportsController extends Controller
         $departmentId = $request->query('department_id');
         $status = $request->query('status');
 
-        // Query utama
+        // Buat query yang sama persis seperti di komponen Livewire Anda
         $query = MasterBudget::with(['department', 'purchases'])
             ->whereBetween('tgl_penyusunan', [$startDate, $endDate]);
 
-        // Filter departemen sesuai hak akses user
+        // Terapkan filter keamanan departemen (SAMA SEPERTI DI LIVEWIRE)
         $userDeptId = auth()->user()->department_id;
-
         if ($userDeptId != 0) {
-            // User biasa hanya lihat departemennya + Over Budget (0)
             $query->where(function($q) use ($userDeptId) {
                 $q->where('department_id', $userDeptId)
                 ->orWhere('department_id', 0);
             });
-            $departmentName = auth()->user()->department->department_name ?? 'Unknown Department';
-        } elseif ($departmentId) {
+        } elseif ($departmentId !== '' && $departmentId !== null) {
             if ($departmentId == '0') {
                 $query->where('department_id', 0);
-                $departmentName = 'All Departemen';
             } else {
                 $query->where(function($q) use ($departmentId) {
                     $q->where('department_id', $departmentId)
                     ->orWhere('department_id', 0);
                 });
-                $departmentName = optional(\Modules\Department\Entities\Departments::find($departmentId))->department_name ?? 'Unknown Department';
             }
-        } else {
-            $departmentName = 'All Departemen';
         }
-
-        // Filter status
+        
         if ($status) {
             $query->where('status', $status);
         }
 
-        // Ambil data
-        $masterBudgets = $query->orderBy('tgl_penyusunan', 'desc')->get();
+        // Ambil SEMUA data
+        $allBudgets = $query->orderBy('department_id')->orderBy('tgl_penyusunan', 'desc')->get();
 
-        // Format tanggal untuk nama file
-        $formattedStart = \Carbon\Carbon::parse($startDate)->translatedFormat('j M Y');
-        $formattedEnd = \Carbon\Carbon::parse($endDate)->translatedFormat('j M Y');
+        // --- LOGIKA PENGELOMPOKAN BARU ---
+        // Kelompokkan berdasarkan department_id
+        $groupedBudgets = $allBudgets->groupBy('department_id');
+        // Pisahkan budget "Over Budget" (department_id = 0)
+        $overBudgets = $groupedBudgets->pull(0);
+        // Sisanya adalah budget per departemen
+        $departmentBudgets = $groupedBudgets;
+        // --- BATAS LOGIKA BARU ---
 
-        // Nama file dinamis
-        $fileName = sprintf(
-            'Budget-Report-%s-(%s - %s).pdf',
-            $departmentName,
-            $formattedStart,
-            $formattedEnd
-        );
-
-        // Generate PDF
+        // Buat PDF menggunakan dompdf
         $pdf = PDF::loadView('reports::budgets.print', [
-            'masterBudgets' => $masterBudgets,
+            'departmentBudgets' => $departmentBudgets, // Kirim data terkelompok
+            'overBudgets' => $overBudgets,             // Kirim data over budget
             'startDate' => $startDate,
-            'endDate' => $endDate,
-            'departmentName' => $departmentName
+            'endDate' => $endDate
         ])->setPaper('a4', 'portrait')
         ->setOption('margin-top', 0)
         ->setOption('margin-right', 0)
         ->setOption('margin-bottom', 0)
         ->setOption('margin-left', 0);
 
-        return $pdf->stream($fileName);
+        return $pdf->stream('laporan-master-budget.pdf');
     }
 
     public function salesReturnReport() {

@@ -31,14 +31,17 @@
 
         h2 { 
             text-align: center; 
-            margin-bottom: 10px; 
+            margin-bottom: -10px; 
             font-size: 16px;
         }
+
+        /* h3 { margin-bottom: 5px; margin-top: 25px; border-bottom: 1px solid #555; padding-bottom: 5px; } */
 
         table { 
             width: 100%; 
             border-collapse: collapse; 
-            margin-top: 10px; 
+            margin-top: 4px; 
+            border-radius: 4px;
         }
 
         th, td { 
@@ -51,16 +54,22 @@
             background-color: rgba(240, 240, 240, 0.5); 
         }
 
+        .header { text-align: center; margin-bottom: 10px; }
+        .page-break { page-break-after: always; }
+        .d-flex { display: flex; }
+
         .text-center { text-align: center; }
         .text-end { text-align: right; }
+        .text-right { text-align: right; }
+        .text-white { color: #fff }
         .mt-2 { margin-top: 10px; }
 
         .badge { 
             padding: 1px 6px; 
-            border-radius: 3px; 
+            border-radius: 2px; 
             color: #fff; 
             font-weight: bold; 
-            font-size: 8px;
+            font-size: 10px;
         }
         .bg-success { background-color: #28a745; }
         .bg-warning { background-color: #ffc107; color: #212529; }
@@ -77,73 +86,38 @@
             <h2>Laporan Master Budget</h2>
             <p>Periode: {{ \Carbon\Carbon::parse($startDate)->format('d M Y') }} s/d {{ \Carbon\Carbon::parse($endDate)->format('d M Y') }}</p>
         </div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Tgl. Susun</th>
-                    <th>No. Budgeting</th>
-                    <th>Departemen</th>
-                    {{-- <th>Tipe</th> --}}
-                    <th>Bulan</th>
-                    <th>Status</th>
-                    <th class="text-right">Nilai Budget</th>
-                    <th class="text-right">Realisasi</th>
-                    <th class="text-right">Sisa</th>
-                    <th class="text-right">Realisasi OB</th>
-                </tr>
-            </thead>
-            <tbody>
-                @forelse($masterBudgets as $budget)
-                    @php
-                        $grand = $budget->grandtotal ?? 0;
-                        $used  = $budget->used_amount ?? 0;
-                        $remain = $budget->remaining; // Gunakan accessor 'remaining'
     
-                        // Kalkulasi Realisasi Over Budget
-                        $over_budget_total = 0;
-                        if ($budget->department_id == 0 && $budget->relationLoaded('purchases')) {
-                            $over_budget_total = $budget->purchases
-                                ->where('status', 'Approved')
-                                ->where('master_budget_remaining', '<', 0)
-                                ->sum(function($pr) {
-                                    return abs($pr->master_budget_remaining);
-                                });
-                        }
-                    @endphp
-                    <tr>
-                        <td>{{ \Carbon\Carbon::parse($budget->tgl_penyusunan)->format('d-m-Y') }}</td>
-                        <td>{{ $budget->no_budgeting }}</td>
-                        <td>{{ $budget->department->department_name ?? ($budget->department_id == 0 ? 'All Departemen' : 'N/A') }}</td>
-                        {{-- <td>
-                            @if($budget->department_id == 0)
-                                <span class="badge bg-danger">Over Budget</span>
-                            @else
-                                <span class="badge bg-info">Budget Utama</span>
-                            @endif
-                        </td> --}}
-                        <td>{{ \Carbon\Carbon::create()->month($budget->bulan)->format('F') }}</td>
-                        <td class="text-center">
-                            @php $status = strtolower($budget->status); @endphp
-                            @if ($status == 'pending')
-                                <span class="badge bg-warning">{{ ucfirst($budget->status) }}</span>
-                            @elseif ($status == 'approved')
-                                <span class="badge bg-success">{{ ucfirst($budget->status) }}</span>
-                            @else
-                                <span class="badge bg-danger">{{ ucfirst($budget->status) }}</span>
-                            @endif
-                        </td>
-                        <td class="text-right">{{ format_currency($grand) }}</td>
-                        <td class="text-right">{{ format_currency($used) }}</td>
-                        <td class="text-right">{{ format_currency($remain) }}</td>
-                        <td class="text-right">{{ $budget->department_id == 0 ? format_currency($over_budget_total) : '-' }}</td>
-                    </tr>
-                @empty
-                    <tr>
-                        <td colspan="10" class="text-center">Tidak ada data untuk periode ini.</td>
-                    </tr>
-                @endforelse
-            </tbody>
-        </table>
+        {{-- 1. LOOP UNTUK BUDGET DEPARTEMEN --}}
+        @foreach($departmentBudgets as $deptId => $budgets)
+            @if($budgets->isNotEmpty())
+                <h3>{{ $budgets->first()->department->department_name }} - <Span class="badge bg-info">Budget Utama</Span></h3>
+                {{-- Kirim 'isOverBudgetTable' => false --}}
+                @include('reports::budgets.partials.print-table', [
+                    'budgets' => $budgets, 
+                    'isOverBudgetTable' => false
+                ])
+            @endif
+        @endforeach
+    
+        {{-- 2. TABEL UNTUK OVER BUDGET --}}
+        @if($overBudgets && $overBudgets->isNotEmpty())
+            <h3>All Departemen - <Span class="badge bg-danger">Budget Lain-Lain</Span></h3>
+            {{-- Kirim 'isOverBudgetTable' => true --}}
+            @include('reports::budgets.partials.print-table', [
+                'budgets' => $overBudgets,
+                'isOverBudgetTable' => true
+            ])
+        @endif
+    
+        {{-- 3. JIKA SEMUA KOSONG --}}
+        @if($departmentBudgets->isEmpty() && (!$overBudgets || $overBudgets->isEmpty()))
+            <table class="table table-bordered">
+                <tr>
+                    <td colspan="10" class="text-center">Tidak ada data untuk periode ini.</td>
+                </tr>
+            </table>
+        @endif
     </div>
+    
 </body>
 </html>

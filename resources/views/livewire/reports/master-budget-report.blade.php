@@ -3,24 +3,21 @@
         <div class="col-12">
             <div class="card border-0 rounded-3 shadow-sm">
                 <div class="card-body">
+                    {{-- FORM FILTER TETAP SAMA --}}
                     <form wire:submit.prevent="generateReport">
                         <div class="form-row">
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>Start Date <span class="text-danger">*</span></label>
                                     <input wire:model="start_date" type="date" class="form-control">
-                                    @error('start_date')
-                                        <span class="text-danger mt-1">{{ $message }}</span>
-                                    @enderror
+                                    @error('start_date') <span class="text-danger mt-1">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                             <div class="col-lg-6">
                                 <div class="form-group">
                                     <label>End Date <span class="text-danger">*</span></label>
                                     <input wire:model="end_date" type="date" class="form-control">
-                                    @error('end_date')
-                                        <span class="text-danger mt-1">{{ $message }}</span>
-                                    @enderror
+                                    @error('end_date') <span class="text-danger mt-1">{{ $message }}</span> @enderror
                                 </div>
                             </div>
                         </div>
@@ -32,16 +29,13 @@
                                     @if(auth()->user()->department_id == 0)
                                         <select wire:model="department_id" class="form-control">
                                             <option value="">Select Departement</option>
-                                            <option value="0">All Departemen</option>
+                                            <option value="0">All Departemen (Over Budget)</option>
                                             @foreach($departments as $department)
                                                 <option value="{{ $department->id }}">{{ $department->department_name }}</option>
                                             @endforeach
                                         </select>
                                     @else
-                                        <input type="text" 
-                                               class="form-control" 
-                                               value="{{ auth()->user()->department->department_name ?? 'N/A' }}" 
-                                               disabled>
+                                        <input type="text" class="form-control" value="{{ auth()->user()->department->department_name ?? 'N/A' }}" disabled>
                                     @endif
                                 </div>
                             </div>
@@ -59,20 +53,16 @@
                         </div>
 
                         <div class="d-flex justify-content-between">
-                            <div class="form-group mb-0">
-                                <button type="submit" class="btn btn-primary">
-                                    <span wire:target="generateReport" wire:loading class="spinner-border spinner-border-sm"></span>
-                                    <i wire:target="generateReport" wire:loading.remove class="bi bi-shuffle"></i>
-                                    Filter Report
-                                </button>
-                            </div>
-                            <div class="form-group mb-0">
-                                <button type="button" wire:click="printReport" class="btn btn-secondary">
-                                    <span wire:target="printReport" wire:loading class="spinner-border spinner-border-sm"></span>
-                                    <i wire:target="printReport" wire:loading.remove class="bi bi-printer"></i>
-                                    Print Report
-                                </button>
-                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <span wire:target="generateReport" wire:loading class="spinner-border spinner-border-sm"></span>
+                                <i wire:target="generateReport" wire:loading.remove class="bi bi-shuffle"></i>
+                                Filter Report
+                            </button>
+                            <button type="button" wire:click="printReport" class="btn btn-secondary">
+                                <span wire:target="printReport" wire:loading class="spinner-border spinner-border-sm"></span>
+                                <i wire:target="printReport" wire:loading.remove class="bi bi-printer"></i>
+                                Print Report
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -80,110 +70,74 @@
         </div>
     </div>
 
-    <div class="row mt-2">
-        <div class="col-12">
-            <div class="card border-0 rounded-3 shadow-sm">
-                <div class="card-body position-relative">
-                    <div wire:loading.flex class="position-absolute w-100 h-100 justify-content-center align-items-center" style="top:0;background-color: rgba(255,255,255,0.5);z-index: 99;">
-                        <div class="spinner-border text-primary" role="status">
-                            <span class="sr-only">Loading...</span>
+    {{-- =============================================== --}}
+    {{-- BAGIAN HASIL LAPORAN (LOGIKA BARU) --}}
+    {{-- =============================================== --}}
+    <div wire:loading.flex class="justify-content-center mt-4">
+        <div class="spinner-border text-primary" role="status">
+            <span class="sr-only">Loading...</span>
+        </div>
+    </div>
+
+    <div wire:loading.remove>
+        {{-- 1. LOOPING UNTUK SETIAP DEPARTEMEN --}}
+        @foreach($departmentBudgets as $deptId => $budgets)
+            @if($budgets->isNotEmpty())
+                <div class="row">
+                    <div class="col-12">
+                        {{-- Judul Departemen --}}
+                        <h4 class="mb-3 fw-semibold">{{ $budgets->first()->department->department_name }} - <span class="px-4 py-1 badge bg-info">Budget Utama</span></h4>
+                        <div class="card border-0 shadow-sm rounded-3">
+                            <div class="card-body">
+                                @include('livewire.reports.partials.budget-table', [
+                                    'budgets' => $budgets, 
+                                    'isOverBudgetTable' => false
+                                ])
+                            </div>
                         </div>
                     </div>
+                </div>
+            @endif
+        @endforeach
 
-                    <table class="table table-bordered table-striped table-responsive text-center mb-0">
-                        <thead>
-                            <tr>
-                                <th>Tgl. Penyusunan</th>
-                                <th>No. Budgeting</th>
-                                <th>Departemen</th>
-                                {{-- <th>Tipe Budget</th> --}}
-                                <th>Bulan</th>
-                                <th>Status</th>
-                                <th class="text-end">Nilai Budgeting</th>
-                                <th>Realisasi (%)</th>
-                                <th class="text-end">Nilai Realisasi</th>
-                                <th class="text-end">Sisa Budget</th>
-                                <th>Sisa (%)</th>
-                                <th class="text-end">Nilai Realisasi Over Budget</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse($masterBudgets as $budget)
-                                @php
-                                    $grand = $budget->grandtotal ?? 0;
-                                    $used  = $budget->used_amount ?? 0;
-                                    $remain = $budget->remaining ?? ($grand - $used);
-                                    $used_percent = $grand > 0 ? round(($used / $grand) * 100, 2) : 0;
-                                    $remain_percent = $grand > 0 ? round(($remain / $grand) * 100, 2) : 0;
-
-                                    // Hitung over budget dari relasi purchases
-                                    $over_budget_total = $budget->purchases()
-                                        ->where('status', 'approved')
-                                        ->where('master_budget_remaining', '<', 0)
-                                        ->sum('master_budget_remaining');
-
-                                    // Nilai minus dijadikan positif untuk tampilan
-                                    $over_budget_total = abs($over_budget_total);
-                                @endphp
-                                <tr>
-                                    <td>{{ \Carbon\Carbon::parse($budget->tgl_penyusunan)->format('d M, Y') }}</td>
-                                    <td>{{ $budget->no_budgeting }}</td>
-                                    <td>{{ $budget->department->department_name ?? ($budget->department_id == 0 ? 'All Departemen' : 'N/A') }}</td>
-                                    {{-- <td>
-                                        @if($budget->department_id == 0)
-                                            <span class="badge bg-danger">Over Budget</span>
-                                        @else
-                                            <span class="badge bg-info">Budget Utama</span>
-                                        @endif
-                                    </td> --}}
-                                    <td>{{ \Carbon\Carbon::create()->month($budget->bulan)->format('F') }}</td>
-                                    <td>
-                                        @php $status = strtolower($budget->status); @endphp
-                                        @if ($status == 'pending')
-                                            <span class="badge bg-warning text-dark">{{ ucfirst($budget->status) }}</span>
-                                        @elseif ($status == 'approved')
-                                            <span class="badge bg-success">{{ ucfirst($budget->status) }}</span>
-                                        @else
-                                            <span class="badge bg-danger">{{ ucfirst($budget->status) }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="text-end">{{ format_currency($grand) }}</td>
-                                    <td>{{ $used_percent }}%</td>
-                                    <td class="text-end">{{ format_currency($used) }}</td>
-                                    <td class="text-end">{{ format_currency($remain) }}</td>
-                                    <td>{{ $remain_percent }}%</td>
-                                    <td class="text-end text-danger fw-bold">
-                                        {{ $over_budget_total > 0 ? format_currency($over_budget_total) : '-' }}
-                                    </td>
-                                </tr>
-                            @empty
-                                <tr>
-                                    <td colspan="12">
-                                        <span class="text-danger">No Master Budget Data Available!</span>
-                                    </td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-
-                    <div @class(['mt-3' => $masterBudgets->hasPages()])>
-                        {{ $masterBudgets->links() }}
+        {{-- 2. TABEL KHUSUS UNTUK OVER BUDGET --}}
+        @if($overBudgets && $overBudgets->isNotEmpty())
+            <div class="row">
+                <div class="col-12">
+                    {{-- Judul Over Budget --}}
+                    <h4 class="mb-3 fw-semibold">All Departemen - <span class="px-4 py-1 badge bg-danger">Budget Lain-Lain</span></h4>
+                    <div class="card border-0 shadow-sm rounded-3">
+                        <div class="card-body">
+                            @include('livewire.reports.partials.budget-table', [
+                                'budgets' => $overBudgets,
+                                'isOverBudgetTable' => true
+                            ])
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        @endif
+
+        {{-- 3. PESAN JIKA TIDAK ADA DATA SAMA SEKALI --}}
+        @if($departmentBudgets->isEmpty() && (!$overBudgets || $overBudgets->isEmpty()))
+            <div class="row rounded-3">
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm">
+                        <div class="card-body text-center">
+                            <span class="text-danger">No Master Budget Data Available for the selected filters!</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
 </div>
 
+{{-- Script untuk membuka tab baru (jika belum ada di layout utama) --}}
 @push('scripts')
 <script>
-    // Pastikan ini berjalan setelah Livewire siap
     document.addEventListener('livewire:init', () => {
-        
-        // Dengarkan event 'open-new-tab' yang dikirim dari method printReport()
         Livewire.on('open-new-tab', (url) => {
-            
-            // Buka URL (rute print PDF) di tab browser baru
             window.open(url, '_blank');
         });
     });

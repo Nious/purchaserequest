@@ -3,24 +3,24 @@
 namespace App\Livewire\Reports;
 
 use Livewire\Component;
-use Livewire\WithPagination;
+// use Livewire\WithPagination; // Kita tidak menggunakan paginasi otomatis lagi
 use Modules\Budget\Entities\MasterBudget;
 use Modules\Department\Entities\Departments;
 
 class MasterBudgetReport extends Component
 {
-    use WithPagination;
+    // use WithPagination; // Hapus ini
 
     public $start_date, $end_date, $department_id, $status;
     public $departments;
-    protected $paginationTheme = 'bootstrap';
+    // Hapus public $masterBudgets;
 
     public function mount()
     {
-        $this->departments = Departments::all(); 
+        $this->departments = Departments::all();
         $this->start_date = now()->startOfMonth()->format('Y-m-d');
         $this->end_date = now()->endOfMonth()->format('Y-m-d');
-        $this->status = ''; 
+        $this->status = '';
 
         $user = auth()->user();
         $this->department_id = $user->department_id != 0 ? $user->department_id : '';
@@ -32,19 +32,16 @@ class MasterBudgetReport extends Component
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
         ]);
-
-        $this->resetPage();
+        // Tidak perlu resetPage() lagi
     }
 
     public function printReport()
     {
-        // 1. Validasi tanggal
         $this->validate([
             'start_date' => 'required|date',
             'end_date'   => 'required|date|after_or_equal:start_date',
         ]);
         
-        // 2. Buat query string dari filter saat ini
         $queryParams = http_build_query([
             'start_date' => $this->start_date,
             'end_date' => $this->end_date,
@@ -52,54 +49,54 @@ class MasterBudgetReport extends Component
             'status' => $this->status,
         ]);
 
-        // 3. Buat URL lengkap ke rute print
         $url = route('reports.master_budget.print') . '?' . $queryParams;
-
-        // 4. Kirim event ke browser untuk membuka tab baru
         $this->dispatch('open-new-tab', $url);
     }
 
     public function render()
     {
-        $query = MasterBudget::with('department')
+        $query = MasterBudget::with(['department', 'purchases']) // Eager load relasi
             ->whereBetween('tgl_penyusunan', [$this->start_date, $this->end_date]);
 
         $userDept = auth()->user()->department_id;
 
-        // 🔹 Jika user bukan admin (department_id ≠ 0)
         if ($userDept != 0) {
-            // Tampilkan budget milik departemennya sendiri + yang department_id == 0
             $query->where(function ($q) use ($userDept) {
                 $q->where('department_id', $userDept)
-                ->orWhere('department_id', 0);
+                  ->orWhere('department_id', 0);
             });
         } else {
-            // 🔹 Jika admin (department_id == 0)
-            // Filter berdasarkan dropdown (jika dipilih)
             if ($this->department_id !== '' && $this->department_id !== null) {
                 if ($this->department_id == 0) {
-                    // Tampilkan hanya yang 0 (All Departemen)
                     $query->where('department_id', 0);
                 } else {
-                    // Tampilkan departemen tertentu + budget umum
                     $query->where(function ($q) {
                         $q->where('department_id', $this->department_id)
-                        ->orWhere('department_id', 0);
+                          ->orWhere('department_id', 0);
                     });
                 }
             }
         }
 
-        // 🔹 Filter status
         if ($this->status) {
             $query->where('status', $this->status);
         }
 
-        $masterBudgets = $query->paginate(10);
+        // Ambil SEMUA data, jangan paginasi
+        $allBudgets = $query->orderBy('department_id')->orderBy('tgl_penyusunan', 'desc')->get();
+
+        // Kelompokkan berdasarkan department_id
+        $groupedBudgets = $allBudgets->groupBy('department_id');
+
+        // Pisahkan budget "Over Budget" (department_id = 0)
+        $overBudgets = $groupedBudgets->pull(0); // pull() akan mengambil dan menghapus dari koleksi utama
+
+        // Sisanya adalah budget per departemen
+        $departmentBudgets = $groupedBudgets;
 
         return view('livewire.reports.master-budget-report', [
-            'masterBudgets' => $masterBudgets
+            'departmentBudgets' => $departmentBudgets,
+            'overBudgets' => $overBudgets
         ]);
     }
-
 }
