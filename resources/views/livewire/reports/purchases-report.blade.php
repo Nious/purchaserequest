@@ -87,7 +87,7 @@
         <div class="col-12">
             <div class="card border-0 rounded-3 shadow-sm">
                 <div class="card-body">
-                    <table class="table table-bordered table-striped text-center mb-0">
+                    <table class="table table-bordered table-responsive rounded-3 table-striped text-center mb-0">
                         <div wire:loading.flex class="col-12 position-absolute justify-content-center align-items-center" style="top:0;right:0;left:0;bottom:0;background-color: rgba(255,255,255,0.5);z-index: 99;">
                             <div class="spinner-border text-primary" role="status">
                                 <span class="sr-only">Loading...</span>
@@ -102,6 +102,8 @@
                             <th>Total</th>
                             <th>Paid</th>
                             <th>Due</th>
+                            <th>Tipe</th>
+                            <th class="text-end">Over Budget</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -128,6 +130,20 @@
                                 <td>{{ format_currency($purchase->total_amount) }}</td>
                                 <td>{{ format_currency($purchase->paid_amount) }}</td>
                                 <td>{{ format_currency($purchase->due_amount) }}</td>
+                                <td>
+                                    @if($purchase->master_budget_remaining < 0)
+                                        <span class="badge bg-danger">Over Budget</span>
+                                    @else
+                                        <span class="badge bg-info">Normal</span>
+                                    @endif
+                                </td>
+                                <td class="text-end text-danger fw-bold">
+                                    @if($purchase->master_budget_remaining < 0)
+                                        {{ format_currency(abs($purchase->master_budget_remaining)) }}
+                                    @else
+                                        -
+                                    @endif
+                                </td>
                             </tr>
                         @empty
                             <tr>

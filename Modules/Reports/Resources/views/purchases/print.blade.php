@@ -56,15 +56,16 @@
         .mt-2 { margin-top: 10px; }
 
         .badge { 
-            padding: 3px 6px; 
+            padding: 1px 6px; 
             border-radius: 4px; 
             color: #fff; 
             font-weight: bold; 
-            font-size: 10px;
+            font-size: 8px;
         }
         .bg-success { background-color: #28a745; }
         .bg-warning { background-color: #ffc107; color: #212529; }
         .bg-danger  { background-color: #dc3545; }
+        .bg-info { background-color: #17a2b8; }
 
         /* Ruang dalam halaman agar isi tidak menempel di tepi */
         .margin-a4 { padding-top: 175px; padding-left:75px; padding-right:75px; padding-bottom:100px;}
@@ -86,6 +87,8 @@
                     <th class="text-right">Total</th>
                     <th class="text-right">Dibayar</th>
                     <th class="text-right">Sisa</th>
+                    <th>Tipe</th>
+                    <th class="text-right">Over Budget</th>
                 </tr>
             </thead>
             <tbody>
@@ -98,10 +101,24 @@
                         <td class="text-right">{{ format_currency($purchase->total_amount) }}</td>
                         <td class="text-right">{{ format_currency($purchase->paid_amount) }}</td>
                         <td class="text-right">{{ format_currency($purchase->due_amount) }}</td>
+                        <td class="text-center">
+                            @if ($purchase->master_budget_remaining < 0)
+                                <span class="badge bg-danger">Over Budget</span>
+                            @else
+                                <span class="badge bg-info">Normal</span>
+                            @endif
+                        </td>
+                        <td class="text-right">
+                            @if ($purchase->master_budget_remaining < 0)
+                                {{ format_currency(abs($purchase->master_budget_remaining)) }}
+                            @else
+                                -
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="text-center">Tidak ada data untuk periode ini.</td>
+                        <td colspan="9" class="text-center">Tidak ada data untuk periode ini.</td>
                     </tr>
                 @endforelse
             </tbody>
