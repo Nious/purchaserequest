@@ -6,15 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
 
     <title>Login | {{ config('app.name') }}</title>
-
-    <!-- Favicon -->
     <link rel="icon" href="{{ asset('images/favicon.png') }}">
-    <!-- CoreUI CSS -->
-    <link rel="stylesheet" href="{{ mix('css/app.css') }}" crossorigin="anonymous">
-    <!-- Bootstrap Icons -->
+    
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
-</head>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
+    @vite(['resources/sass/app.scss', 'resources/js/app.js'])
+</head>
 <body class="c-app flex-row align-items-center">
 <div class="container">
     <div class="row mb-3">
@@ -22,18 +20,22 @@
             <img width="200" src="{{ asset('images/logo-dark.png') }}" alt="Logo">
         </div>
     </div>
+    <div class="text-center">
+        <h5 class="fw-light">Sistem Budgeting dan Purchase Request</h5>
+        <h2 class="fw-semibold">PT ERAN PLASTINDO UTAMA</h2>
+    </div>
     <div class="row justify-content-center">
-        <div class="col-md-5">
+        <div class="col-md-7 col-xl-4">
             @if(Session::has('account_deactivated'))
                 <div class="alert alert-danger" role="alert">
                     {{ Session::get('account_deactivated') }}
                 </div>
             @endif
-            <div class="card p-4 border-0 shadow-sm">
+            <div class="card rounded-3 p-4 border-0 shadow-md">
                 <div class="card-body">
                     <form id="login" method="post" action="{{ url('/login') }}">
                         @csrf
-                        <h1>Login</h1>
+                        <h2 class="fw-semibold text-gray">Login</h2>
                         <p class="text-muted">Sign In to your account</p>
                         <div class="input-group mb-3">
                             <div class="input-group-prepend">
@@ -91,7 +93,7 @@
 </div>
 
 <!-- CoreUI -->
-<script src="{{ mix('js/app.js') }}" defer></script>
+{{-- <script src="{{ mix('js/app.js') }}" defer></script> --}}
 <script>
     let login = document.getElementById('login');
     let submit = document.getElementById('submit');

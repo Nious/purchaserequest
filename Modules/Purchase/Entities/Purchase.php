@@ -5,6 +5,7 @@ namespace Modules\Purchase\Entities;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Modules\Product\Entities\Product;
+use Modules\Approval\Entities\ApprovalRequest;
 
 class Purchase extends Model
 {
@@ -32,6 +33,11 @@ class Purchase extends Model
 
     public function user() {
         return $this->belongsTo(\App\Models\User::class, 'users_id', 'id');
+    }
+
+    public function approvalRequest()
+    {
+        return $this->belongsTo(ApprovalRequest::class, 'approval_request_id');
     }
 
     public static function boot() {

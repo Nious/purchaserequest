@@ -15,6 +15,9 @@ use Modules\Purchase\Http\Controllers\PurchaseController;
 
 Route::group(['middleware' => 'auth'], function () {
 
+    Route::get('/purchases/pending', [PurchaseController::class, 'pending'])
+        ->name('purchases.pending');
+
     //Generate PDF
     Route::get('/purchases/pdf/{id}', function ($id) {
         $purchase = \Modules\Purchase\Entities\Purchase::findOrFail($id);
@@ -38,6 +41,9 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('/purchase-payments/{purchase_id}/edit/{purchasePayment}', 'PurchasePaymentsController@edit')->name('purchase-payments.edit');
     Route::patch('/purchase-payments/update/{purchasePayment}', 'PurchasePaymentsController@update')->name('purchase-payments.update');
     Route::delete('/purchase-payments/destroy/{purchasePayment}', 'PurchasePaymentsController@destroy')->name('purchase-payments.destroy');
+
+    Route::get('/purchases-print-all', [PurchaseController::class, 'printAll'])
+         ->name('purchases.printAll');
     
     Route::post('/purchases/{id}/update-status', [PurchaseController::class, 'updateStatus'])
     ->name('purchases.updateStatus');

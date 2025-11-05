@@ -17,6 +17,7 @@ use Modules\Approval\Entities\ApprovalRule;
 use Modules\Approval\Entities\ApprovalRuleLevel;
 use Modules\Approval\Entities\ApprovalRequestLog;
 use Modules\Approval\Entities\ApprovalRuleUser;
+use PDF;
 
 class MasterBudgetsController extends Controller
 {
@@ -455,6 +456,72 @@ class MasterBudgetsController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function pending(Request $request)
+    {
+        // 1. Ambil status dari URL (default 'pending')
+        $activeStatus = $request->query('status', 'pending');
 
+        // 2. Mulai query, muat relasi
+        $query = MasterBudget::with(['department', 'approvalRequest.logs.approver']);
 
+        // 3. Ambil data user login
+        $user = auth()->user();
+
+        // 4. Jika user bukan admin (department_id ≠ 0)
+        if ($user->department_id != 0) {
+            $query->where(function ($q) use ($user) {
+                $q->where('department_id', $user->department_id)
+                  ->orWhere('department_id', 0);
+            });
+            // Hanya tampilkan data milik departemennya
+            // $query->where('department_id', $user->department_id);
+        }
+
+        // 5. Terapkan filter status (jika bukan 'all')
+        if ($activeStatus !== 'all') {
+            $query->where('status', ucfirst($activeStatus)); 
+        }
+
+        // 6. Urutkan dan ambil data
+        $allBudgets = $query->orderBy('tgl_penyusunan', 'desc')->get();
+
+        // 7. Kirim data dan status aktif ke view
+        return view('budget::master_budget.pending', [
+            'pendingBudgets' => $allBudgets,
+            'activeStatus'   => $activeStatus,
+        ]);
+    }
+
+    public function printAll(Request $request)
+    {
+        // 1. Mulai query dasar (sama seperti di query() DataTable)
+        $query = MasterBudget::with('department');
+
+        // 2. Tiru filter search dari DataTable
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            
+            // Sesuaikan ini agar cocok dengan kolom yang bisa dicari
+            $query->where(function($q) use ($search) {
+                $q->where('no_budgeting', 'LIKE', "%{$search}%")
+                  ->orWhere('description', 'LIKE', "%{$search}%")
+                  ->orWhere('status', 'LIKE', "%{$search}%")
+                  ->orWhereHas('department', function($dq) use ($search) {
+                      $dq->where('department_name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+        
+        $budgets = $query->orderBy('tgl_penyusunan', 'desc')->get();
+        
+        // 3. Muat view 'print_all' dengan data
+        $pdf = PDF::loadView('budget::master_budget.print_all', compact('budgets'))
+        ->setPaper('a4', 'portrait')
+        ->setOption('margin-top', 0)
+        ->setOption('margin-right', 0)
+        ->setOption('margin-bottom', 0)
+        ->setOption('margin-left', 0);
+
+        return $pdf->stream('semua-master-budget.pdf');
+    }
 }

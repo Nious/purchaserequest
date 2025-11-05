@@ -11,81 +11,106 @@
 </ol>
 @endsection
 
+@php
+    $status = strtolower($budget->status);
+    
+    // 1. Cek apakah user yg login adalah approver di level ini
+    $isCurrentUserApprover = $approvalLogs
+                                ->where('action', 'assigned') // Cari yang masih menunggu
+                                ->where('user_id', Auth::id()) // Cocokkan dengan user yg login
+                                ->isNotEmpty(); // true jika user ditemukan
+@endphp
+
 @section('content')
 <div class="container-fluid mb-4">
-    <div class="card shadow-sm border-0">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 fw-bold text-secondary">Detail Master Budget</h5>
-            <div>
-                {{-- Tombol Edit --}}
-                @if (strtolower($budget->status) === 'pending')
-                    <a href="{{ route('master_budget.edit', $budget->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
-                        <i class="bi bi-pencil-square"></i> Edit
-                    </a>
-                @endif
-
-                {{-- Status Dropdown --}}
-                @if (strtolower($budget->status) === 'pending')
-                    <button class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
-                        <i class="bi bi-hourglass-split"></i> Pending
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a href="#" class="dropdown-item approval-action" data-status="approved">✅ Approve</a></li>
-                        <li><a href="#" class="dropdown-item approval-action" data-status="rejected">❌ Reject</a></li>
-                    </ul>
-                @elseif (strtolower($budget->status) === 'approved')
-                    <button class="btn btn-sm btn-success" disabled>Approved</button>
-                @elseif (strtolower($budget->status) === 'rejected')
-                    <button class="btn btn-sm btn-danger" disabled>Rejected</button>
-                @else
-                    <button class="btn btn-sm btn-secondary" disabled>Unknown</button>
-                @endif
-
-            </div>
-        </div>
-        <div class="card-header">
-            <h5 class="mb-2 fw-bold text-secondary">Log Approval</h5>
-            
-            {{-- Jika tidak ada log sama sekali --}}
-            @if($approvalLogs->isEmpty())
-                <h6 class="text-muted my-0">Belum ada riwayat approval.</h6>
+    <div class="d-md-flex justify-content-between align-items-center">
+        <h3 class="mb-1 fw-semibold">Detail Master Budget
+            @if($budget->department_id === 0)
+                <span class="badge bg-danger ms-2">Over Budget</span>
+            @else
+                <span class="badge bg-info ms-2">{{ $budget->department->department_name }}</span>
             @endif
-        
-            {{-- Loop untuk log yang SUDAH DISETUJUI --}}
-            @foreach($approvalLogs->where('action', 'approved') as $log)
-                <div class_content="d-flex justify-content-between align-items-center">
-                    <h6 class="text-success my-0">
-                        <i class="bi bi-check-circle-fill"></i>
-                        Disetujui oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
-                    </h6>
-                    @if($log->comment)
-                        <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
-                    @endif
-                </div>
-            @endforeach
-        
-            {{-- Loop untuk log yang MASIH MENUNGGU --}}
-            @foreach($approvalLogs->where('action', 'assigned') as $log)
-                 <h6 class="text-warning my-0">
-                    <i class="bi bi-hourglass-split"></i>
-                    Menunggu approval dari: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
-                 </h6>
-            @endforeach
-        
-            {{-- Loop untuk log yang DITOLAK --}}
-            @foreach($approvalLogs->where('action', 'rejected') as $log)
-                 <div class_content="d-flex justify-content-between align-items-center">
-                     <h6 class="text-danger my-0">
-                        <i class="bi bi-x-circle-fill"></i>
-                        Ditolak oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
-                     </h6>
-                     @if($log->comment)
-                        <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
-                     @endif
-                 </div>
-            @endforeach
-        </div>
+        </h3>
+        <div>
+            {{-- Tombol Edit --}}
+            @if (strtolower($budget->status) === 'pending')
+                <a href="{{ route('master_budget.edit', $budget->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </a>
+            @endif
 
+            {{-- Status Dropdown --}}
+            @if ($status === 'pending' && $isCurrentUserApprover)
+                <button class="btn btn-sm btn-primary dropdown-toggle" data-toggle="dropdown">
+                    <i class="bi bi-person-check"></i> Menunggu Aksi Anda
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a href="#" class="dropdown-item approval-action" data-status="approved">✅ Approve</a></li>
+                    <li><a href="#" class="dropdown-item approval-action" data-status="rejected">❌ Reject</a></li>
+                </ul>
+
+            {{-- 3. Tampilkan status sebagai teks non-interaktif untuk kasus lain --}}
+            @elseif ($status === 'pending')
+                <button class="btn btn-sm btn-warning" disabled>
+                    <i class="bi bi-hourglass-split"></i> Pending
+                </button>
+            @elseif ($status === 'approved')
+                <button class="btn btn-sm btn-success" disabled>
+                    <i class="bi bi-check2-circle"></i> Approved
+                </button>
+            @elseif ($status === 'rejected')
+                <button class="btn btn-sm btn-danger" disabled>
+                    <i class="bi bi-x-circle"></i> Rejected
+                </button>
+            @else
+                <button class="btn btn-sm btn-secondary" disabled>Unknown</button>
+            @endif
+
+        </div>
+    </div>
+    <div class="card-header rounded-3 mt-3">
+        <h5 class="mb-2 fw-bold text-secondary">Log Approval</h5>
+        
+        {{-- Jika tidak ada log sama sekali --}}
+        @if($approvalLogs->isEmpty())
+            <h6 class="text-muted my-0">Belum ada riwayat approval.</h6>
+        @endif
+    
+        {{-- Loop untuk log yang SUDAH DISETUJUI --}}
+        @foreach($approvalLogs->where('action', 'approved') as $log)
+            <div class_content="d-flex justify-content-between align-items-center">
+                <h6 class="text-success my-0">
+                    <i class="bi bi-check-circle-fill"></i>
+                    Disetujui oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                </h6>
+                @if($log->comment)
+                    <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
+                @endif
+            </div>
+        @endforeach
+    
+        {{-- Loop untuk log yang MASIH MENUNGGU --}}
+        @foreach($approvalLogs->where('action', 'assigned') as $log)
+             <h6 class="text-warning my-0">
+                <i class="bi bi-hourglass-split"></i>
+                Menunggu approval dari: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+             </h6>
+        @endforeach
+    
+        {{-- Loop untuk log yang DITOLAK --}}
+        @foreach($approvalLogs->where('action', 'rejected') as $log)
+             <div class_content="d-flex justify-content-between align-items-center">
+                 <h6 class="text-danger my-0">
+                    <i class="bi bi-x-circle-fill"></i>
+                    Ditolak oleh: <strong>{{ $log->approver->name ?? 'User tidak dikenal' }}</strong> (Level {{ $log->level }})
+                 </h6>
+                 @if($log->comment)
+                    <h6 class="my-0 fst-italic">Note: "{{ $log->comment }}"</h6>
+                 @endif
+             </div>
+        @endforeach
+    </div>
+    <div class="card shadow-sm border-0 rounded-3 mt-3">
         <div class="card-body">
             {{-- Informasi Budget --}}
             <h5 class="fw-bold mb-3 text-secondary">Informasi Budget</h5>

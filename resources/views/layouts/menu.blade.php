@@ -148,7 +148,7 @@
                 </a>
             </li>
             <li class="c-sidebar-nav-item">
-                <a class="c-sidebar-nav-link {{ request()->routeIs('payments-report.index') ? 'c-active' : '' }}" href="{{ route('payments-report.index') }}">
+                <a class="c-sidebar-nav-link {{ request()->routeIs('master-budget-report.index') ? 'c-active' : '' }}" href="{{ route('master-budget-report.index') }}">
                     <i class="c-sidebar-nav-icon bi bi-clipboard-data" style="line-height: 1;"></i> Budget Report
                 </a>
             </li>

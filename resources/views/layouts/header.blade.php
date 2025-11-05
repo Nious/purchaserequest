@@ -69,32 +69,16 @@
             ->get();
     @endphp
 
-    <li class="c-header-nav-item dropdown d-md-down-none mr-3">
-        <a class="c-header-nav-link" data-toggle="dropdown" href="#" role="button"
-           aria-haspopup="true" aria-expanded="false">
+    <li class="c-header-nav-item d-md-down-none mr-3">
+        
+        {{-- UBAH 'href' ke rute 'master_budget.pending' --}}
+        <a class="c-header-nav-link" href="{{ route('master_budget.pending') }}">
+            
             <i class="bi bi-wallet2 text-info" style="font-size: 20px;"></i>
             @if($pending_master_budgets->count() > 0)
                 <span class="badge badge-pill badge-info">{{ $pending_master_budgets->count() }}</span>
             @endif
         </a>
-
-        <div class="dropdown-menu dropdown-menu-right dropdown-menu-lg pt-0">
-            <div class="dropdown-header bg-light">
-                <strong>Master Budget Pending ({{ $pending_master_budgets->count() }})</strong>
-            </div>
-
-            @forelse($pending_master_budgets as $budget)
-                <a class="dropdown-item" href="{{ route('master_budget.show', $budget->id) }}">
-                    <i class="bi bi-hourglass-split text-info mr-1"></i>
-                    Master Budget <strong>{{ $budget->no_budgeting }}</strong> pending approval.
-                </a>
-            @empty
-                <a class="dropdown-item text-muted" href="#">
-                    <i class="bi bi-check2-circle text-success mr-2"></i>
-                    No pending Master Budget.
-                </a>
-            @endforelse
-        </div>
     </li>
     @endcan
 
@@ -109,15 +93,20 @@
             ->get();
     @endphp
 
-    <li class="c-header-nav-item dropdown d-md-down-none mr-3">
-        <a class="c-header-nav-link" data-toggle="dropdown" href="#" role="button"
-           aria-haspopup="true" aria-expanded="false">
+    {{-- Hapus kelas "dropdown" dari <li> --}}
+    <li class="c-header-nav-item d-md-down-none mr-3">
+        
+        {{-- Ubah 'href' ke rute Anda dan hapus atribut data-toggle/role/aria --}}
+        <a class="c-header-nav-link" href="{{ route('purchases.pending') }}">
+            
+            {{-- Ikon dan badge tetap sama --}}
             <i class="bi bi-file-earmark-text text-warning" style="font-size: 20px;"></i>
             @if($pending_purchase_requests->count() > 0)
                 <span class="badge badge-pill badge-warning">{{ $pending_purchase_requests->count() }}</span>
             @endif
         </a>
 
+        {{-- Hapus seluruh blok <div class="dropdown-menu">...</div> --}}
 
     </li>
     @endcan

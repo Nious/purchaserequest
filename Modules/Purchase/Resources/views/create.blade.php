@@ -46,13 +46,27 @@
                             <div class="col-lg-4">
                                 <div class="form-group">
                                     <label for="department_id">Department <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control" 
-                                        value="{{ optional(auth()->user()->department)->department_name ?? '-' }}" readonly>
-                                    <input type="hidden" name="department_id" 
-                                        value="{{ optional(auth()->user()->department)->id ?? '' }}">
+                            
+                                    @if(auth()->user()->department_id == 0)
+                                        {{-- User dengan department_id 0 bisa pilih departemen --}}
+                                        <select name="department_id" class="form-control" required>
+                                            <option value="">-- Pilih Department --</option>
+                                            @foreach(\Modules\Department\Entities\Departments::all() as $dept)
+                                                <option value="{{ $dept->id }}"
+                                                    {{ old('department_id') == $dept->id ? 'selected' : '' }}>
+                                                    {{ $dept->department_name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        {{-- User selain 0 tidak bisa pilih, readonly --}}
+                                        <input type="text" class="form-control" 
+                                            value="{{ optional(auth()->user()->department)->department_name ?? '-' }}" readonly>
+                                        <input type="hidden" name="department_id" 
+                                            value="{{ optional(auth()->user()->department)->id ?? '' }}">
+                                    @endif
                                 </div>
-                            </div>
-
+                            </div>                            
 
                             {{-- Requester --}}
                             <div class="col-lg-4">

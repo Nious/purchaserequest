@@ -93,5 +93,8 @@ class MasterBudget extends Model
         $this->syncStatusToSource($request);
     }
 
-    
+    public function purchases()
+    {
+        return $this->hasMany(\Modules\Purchase\Entities\Purchase::class, 'master_budget_id', 'id');
+    }
 }

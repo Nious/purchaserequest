@@ -26,8 +26,11 @@ class ProductDataTable extends DataTable
             ->addColumn('product_price', function ($data) {
                 return format_currency($data->product_price);
             })
-            ->addColumn('product_quantity', function ($data) {
-                return $data->product_quantity . ' ' . $data->product_unit;
+            // ->addColumn('product_quantity', function ($data) {
+            //     return $data->product_quantity . ' ' . $data->product_unit;
+            // })
+            ->addColumn('product_unit', function ($data) {
+                return $data->product_unit;
             })
             ->rawColumns(['product_image']);
     }
@@ -82,8 +85,8 @@ class ProductDataTable extends DataTable
                 ->title('Price')
                 ->className('text-center align-middle'),
 
-            Column::computed('product_quantity')
-                ->title('Quantity')
+            Column::computed('product_unit')
+                ->title('UOM')
                 ->className('text-center align-middle'),
 
             Column::computed('action')

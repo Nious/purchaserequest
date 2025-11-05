@@ -26,6 +26,7 @@ use Modules\Approval\Entities\ApprovalRuleLevel;
 use Modules\Approval\Entities\ApprovalRequestLog;
 use Modules\Approval\Entities\ApprovalRuleUser;
 use Illuminate\Support\Facades\Log;
+use PDF;
 
 class PurchaseController extends Controller
 {
@@ -1001,6 +1002,7 @@ class PurchaseController extends Controller
         // --- Inisialisasi Variabel ---
         $currentRemainingBudget = 0; // Ini akan menjadi Total Alokasi Budget Dept
         $sisaBudgetSetelahPRIni = 0; // Ini akan menjadi Sisa Budget Dept Saat Ini
+        $sisaBudgetTanpaReserved = 0;
         $saldoOverBudget = 0;         // Ini akan menjadi Sisa Budget Non-Dept
         $purchaseDateObj = null;
         $month = null;
@@ -1030,9 +1032,13 @@ class PurchaseController extends Controller
                                 ->where('status', 'Approved') 
                                 ->selectRaw('SUM(grandtotal) as total_budget, SUM(used_amount) as total_used, SUM(reserved_amount) as total_reserved')
                                 ->first();
+
+            $totalAlokasi = $result->total_budget ?? 0;
             
             $currentRemainingBudget = $result->total_budget ?? 0; // Total Alokasi Dept
             $sisaBudgetSetelahPRIni = $currentRemainingBudget - ($result->total_used ?? 0) - ($result->total_reserved ?? 0); // Sisa Budget Dept Saat Ini
+
+            $sisaBudgetTanpaReserved = $totalAlokasi - ($result->total_used ?? 0);
 
             // 2. Jika ini Over Budget, ambil juga data Budget Non-Departemen
             if (isset($approvalRequest) && $approvalRequest->requestable_type === 'Over Budget') {
@@ -1052,6 +1058,7 @@ class PurchaseController extends Controller
             'purchase', 
             'currentRemainingBudget', 
             'sisaBudgetSetelahPRIni',
+            'sisaBudgetTanpaReserved',
             'approvalLogs',
             'approvalRequest', // Kirim request utama
             'saldoOverBudget'    // Kirim sisa budget non-dept
@@ -1190,5 +1197,99 @@ class PurchaseController extends Controller
             // Ini adalah 'sisaBudgetSetelahPRIni' dari contoh Anda
             'remaining' => $sisaBudgetSetelahPRIni
         ];
+    }
+
+    public function pending(Request $request)
+    {
+        $status = $request->get('status', 'pending');
+
+        $user = auth()->user();
+
+        $pendingPurchases = Purchase::with([
+                'department',
+                'user',
+                'approvalRequest.logs.approver',
+            ])
+            // 🔹 Jika user bukan admin (department_id ≠ 0)
+            ->when($user->department_id != 0, function ($query) use ($user) {
+                // Hanya tampilkan data milik departemennya
+                // $query->where('department_id', $user->department_id);
+                $query->where(function ($q) use ($user) {
+                    $q->where('department_id', $user->department_id)
+                      ->orWhere('department_id', 0);
+                });
+            })
+            // 🔹 Filter status (jika bukan 'all')
+            ->when($status != 'all', function ($query) use ($status) {
+                $query->where('status', $status);
+            })
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('purchase::pending', [
+            'pendingPurchases' => $pendingPurchases,
+            'activeStatus'     => $status,
+        ]);
+    }
+
+    public function print($id)
+    {
+        $purchase = Purchase::findOrFail($id);
+        $supplier = null;
+        if ($purchase->supplier_id) {
+            $supplier = Supplier::find($purchase->supplier_id);
+        }
+
+        $purchaseDate = Carbon::parse($purchase->date);
+        $day = $purchaseDate->day;
+        $month = $purchaseDate->month;
+        $year = $purchaseDate->year;
+
+        // Ini adalah cara Dompdf (sintaksnya hampir identik)
+        $pdf = PDF::loadView('purchase::print', [
+            'purchase' => $purchase,
+            'supplier' => $supplier,
+        ])->setPaper('a4', 'portrait')
+        ->setOption('margin-top', 0)
+        ->setOption('margin-right', 0)
+        ->setOption('margin-bottom', 0)
+        ->setOption('margin-left', 0);
+
+        return $pdf->stream('Purchase Request-'. $purchase->reference .'-('. $day .'-'. $month .'-'. $year .').pdf');
+    }
+
+    public function printAll(Request $request)
+    {
+        // 1. Mulai query dasar (sama seperti di query() DataTable)
+        $query = Purchase::with(['user', 'department']);
+
+        // 2. Tiru filter search dari DataTable
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            
+            // Sesuaikan ini agar cocok dengan kolom yang bisa dicari
+            $query->where(function($q) use ($search) {
+                $q->where('reference', 'LIKE', "%{$search}%")
+                  ->orWhere('status', 'LIKE', "%{$search}%")
+                  ->orWhereHas('user', function($uq) use ($search) {
+                      $uq->where('name', 'LIKE', "%{$search}%");
+                  })
+                  ->orWhereHas('department', function($dq) use ($search) {
+                      $dq->where('department_name', 'LIKE', "%{$search}%");
+                  });
+            });
+        }
+        
+        $purchases = $query->orderBy('date', 'desc')->get();
+        
+        // 3. Muat view 'print_all' dengan data
+        $pdf = PDF::loadView('purchase::print_all', compact('purchases'))
+                    ->setPaper('a4', 'portrait')
+                    ->setOption('margin-top', 0)
+                    ->setOption('margin-right', 0)
+                    ->setOption('margin-bottom', 0)
+                    ->setOption('margin-left', 0);
+
+        return $pdf->stream('semua-purchase-request.pdf');
     }
 }
