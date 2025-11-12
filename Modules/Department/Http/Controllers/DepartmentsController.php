@@ -20,7 +20,7 @@ class DepartmentsController extends Controller
 
     public function store(Request $request)
     {
-        abort_if(Gate::denies('access_departments'), 403);
+        abort_if(Gate::denies('create_departments'), 403);
 
         $request->validate([
             'department_code' => 'required|unique:departments,department_code',
@@ -39,7 +39,7 @@ class DepartmentsController extends Controller
 
     public function edit($id)
     {
-        abort_if(Gate::denies('access_departments'), 403);
+        abort_if(Gate::denies('edit_departments'), 403);
 
         $department = Departments::findOrFail($id);
 
@@ -49,7 +49,7 @@ class DepartmentsController extends Controller
 
     public function update(Request $request, $id)
     {
-        abort_if(Gate::denies('access_departments'), 403);
+        abort_if(Gate::denies('edit_departments'), 403);
 
         $request->validate([
             'department_code' => 'required|unique:departments,department_code,' . $id,
@@ -68,7 +68,7 @@ class DepartmentsController extends Controller
 
     public function destroy($id)
     {
-        abort_if(Gate::denies('access_departments'), 403);
+        abort_if(Gate::denies('delete_departments'), 403);
 
         $department = Departments::findOrFail($id);
         $department->delete();

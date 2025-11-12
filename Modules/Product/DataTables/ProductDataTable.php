@@ -26,13 +26,10 @@ class ProductDataTable extends DataTable
             ->addColumn('product_price', function ($data) {
                 return format_currency($data->product_price);
             })
-            // ->addColumn('product_quantity', function ($data) {
-            //     return $data->product_quantity . ' ' . $data->product_unit;
-            // })
             ->addColumn('product_unit', function ($data) {
-                return $data->product_unit;
+                return '<span class="badge bg-info">'.$data->product_unit.'</span>';
             })
-            ->rawColumns(['product_image']);
+            ->rawColumns(['product_image', 'product_unit']);
     }
 
     public function query(Product $model)

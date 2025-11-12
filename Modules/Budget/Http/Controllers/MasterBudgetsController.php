@@ -30,11 +30,13 @@ class MasterBudgetsController extends Controller
 
     public function index(MasterBudgetsDataTable $dataTable)
     {
+        abort_if(Gate::denies('access_budget'), 403);
         return $dataTable->render('budget::master_budget.index');
     }
 
     public function create()
     {
+        abort_if(Gate::denies('create_budget'), 403);
         $lastBudget = MasterBudget::orderBy('id', 'desc')->first();
         $nextNumber = $lastBudget ? (int) str_replace('BDGT', '', $lastBudget->no_budgeting) + 1 : 1;
         $noBudgeting = 'BDGT' . str_pad($nextNumber, 3, '0', STR_PAD_LEFT);
@@ -142,6 +144,7 @@ class MasterBudgetsController extends Controller
 
     public function show($id)
     {
+        abort_if(Gate::denies('show_budget'), 403);
         // Ambil data MasterBudget
         $budget = MasterBudget::with('details', 'department')->findOrFail($id);
 
@@ -161,6 +164,7 @@ class MasterBudgetsController extends Controller
 
     public function edit($id)
     {
+        abort_if(Gate::denies('edit_budget'), 403);
         $masterBudget = MasterBudget::with('details')->findOrFail($id);
         $departments  = \Modules\Department\Entities\Departments::all();
         $categories   = \Modules\Product\Entities\Category::all();
@@ -226,7 +230,7 @@ class MasterBudgetsController extends Controller
 
     public function destroy($id)
     {
-
+        abort_if(Gate::denies('delete_budget'), 403);
         $budget = MasterBudget::findOrFail($id);
 
         try {

@@ -18,13 +18,18 @@ Route::group(['middleware' => 'auth'], function () {
     Route::get('/home', 'HomeController@index')
         ->name('home');
 
-    Route::get('/sales-purchases/chart-data', 'HomeController@salesPurchasesChart')
-        ->name('sales-purchases.chart');
+    Route::get('/budget-purchases/chart-data', 'HomeController@budgetPurchasesChart')
+        ->name('budget.purchases.chart');
+    
+    Route::get('/home/total-budget-purchase', [HomeController::class, 'totalBudgetPurchase'])->name('home.totalBudgetPurchase');
+
+
+    Route::get('/budgetbydepartmentchart', [App\Http\Controllers\HomeController::class, 'budgetByDepartmentChart'])
+    ->name('home.budgetByDepartmentChart');
+
 
     Route::get('/current-month/chart-data', 'HomeController@currentMonthChart')
         ->name('current-month.chart');
 
-    Route::get('/payment-flow/chart-data', 'HomeController@paymentChart')
-        ->name('payment-flow.chart');
 });
 

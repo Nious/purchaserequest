@@ -42,12 +42,18 @@ class PermissionsTableSeeder extends Seeder
             'access_product_categories',
             //Barcode Printing
             'print_barcodes',
-            //Adjustments
-            'access_adjustments',
-            'create_adjustments',
-            'show_adjustments',
-            'edit_adjustments',
-            'delete_adjustments',
+            //Depatment
+            'access_departments',
+            'create_departments',
+            'show_departments',
+            'edit_departments',
+            'delete_departments',
+            //Master Budgets
+            'access_budget',
+            'create_budget',
+            'show_budget',
+            'edit_budget',
+            'delete_budget',
             //Quotaions
             'access_quotations',
             'create_quotations',
@@ -127,11 +133,13 @@ class PermissionsTableSeeder extends Seeder
         foreach ($permissions as $permission) {
             Permission::create([
                 'name' => $permission
+                'guard_name' => 'web',
             ]);
         }
 
         $role = Role::create([
             'name' => 'Admin'
+            'guard_name' => 'web',
         ]);
 
         $role->givePermissionTo($permissions);

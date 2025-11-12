@@ -1,90 +1,94 @@
-$(document).ready(function () {
-    let salesPurchasesBar = document.getElementById('salesPurchasesChart');
-    $.get('/sales-purchases/chart-data', function (response) {
-        let salesPurchasesChart = new Chart(salesPurchasesBar, {
-            type: 'bar',
-            data: {
-                labels: response.sales.original.days,
-                datasets: [{
-                    label: 'Sales',
-                    data: response.sales.original.data,
-                    backgroundColor: [
-                        '#6366F1',
-                    ],
-                    borderColor: [
-                        '#6366F1',
-                    ],
-                    borderWidth: 1
-                },
-                    {
-                        label: 'Purchases',
-                        data: response.purchases.original.data,
-                        backgroundColor: [
-                            '#A5B4FC',
-                        ],
-                        borderColor: [
-                            '#A5B4FC',
-                        ],
-                        borderWidth: 1
-                    }
-                ]
-            },
-            options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
-            }
-        });
-    });
+document.addEventListener('DOMContentLoaded', function() {
+    const monthEl = document.getElementById('month');
+    const yearEl = document.getElementById('year');
 
-    let overviewChart = document.getElementById('currentMonthChart');
-    $.get('/current-month/chart-data', function (response) {
-        let currentMonthChart = new Chart(overviewChart, {
-            type: 'doughnut',
-            data: {
-                labels: ['Sales', 'Purchases', 'Expenses'],
-                datasets: [{
-                    data: [response.sales, response.purchases, response.expenses],
-                    backgroundColor: [
-                        '#F59E0B',
-                        '#0284C7',
-                        '#EF4444',
-                    ],
-                    hoverBackgroundColor: [
-                        '#F59E0B',
-                        '#0284C7',
-                        '#EF4444',
-                    ],
-                }]
-            },
-        });
-    });
+    function updateDashboard(month, year) {
+        // 1️⃣ Update Total Budget & Purchases
+        fetch(`/home/total-budget-purchase?month=${month}&year=${year}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('approvedBudget').innerText = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(data.approved_budget);
+                document.getElementById('totalPurchase').innerText = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR' }).format(data.purchases);
+            });
 
-    let paymentChart = document.getElementById('paymentChart');
-    $.get('/payment-flow/chart-data', function (response) {
-        let cashflowChart = new Chart(paymentChart, {
-            type: 'line',
-            data: {
-                labels: response.months,
-                datasets: [
-                    {
-                        label: 'Payment Sent',
-                        data: response.payment_sent,
-                        fill: false,
-                        borderColor: '#EA580C',
-                        tension: 0
+        // 2️⃣ Update Budget Purchases Chart
+        fetch(`/budget-purchases/chart-data?month=${month}&year=${year}`)
+            .then(res => res.json())
+            .then(data => {
+                const ctx = document.getElementById('budgetPurchasesChart').getContext('2d');
+                if(window.budgetPurchasesChart) window.budgetPurchasesChart.destroy();
+                window.budgetPurchasesChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.labels,
+                        datasets: [
+                            {
+                                label: 'Budget',
+                                data: data.approvedBudgets,
+                                borderColor: '#28a745',
+                                backgroundColor: 'rgba(40, 167, 69, 0.2)',
+                                tension: 0.3,
+                                fill: true
+                            },
+                            {
+                                label: 'Purchases',
+                                data: data.approvedPurchases,
+                                borderColor: '#ffc107',
+                                backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                                tension: 0.3,
+                                fill: true
+                            }
+                        ]
+                    }
+                });
+            });
+
+        // 3️⃣ Update Doughnut Chart
+        fetch(`/budget-by-department/chart-data?month=${month}&year=${year}`)
+            .then(res => res.json())
+            .then(data => {
+                const ctx = document.getElementById('budgetDepartmentChart').getContext('2d');
+                if(window.budgetDepartmentChart) window.budgetDepartmentChart.destroy();
+
+                const bgColors = (data.labels.length === 1 && data.labels[0] === 'No Data')
+                    ? ['#E5E7EB']
+                    : ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#8BC34A', '#FF5722', '#607D8B'];
+
+                window.budgetDepartmentChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            data: data.data,
+                            backgroundColor: bgColors,
+                            borderWidth: 1
+                        }]
                     },
-                    {
-                        label: 'Payment Received',
-                        data: response.payment_received,
-                        fill: false,
-                        borderColor: '#2563EB',
-                        tension: 0
-                    },
-                ]
-            },
-        });
-    });
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 15, padding: 20, font: { size: 13 } } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let total = context.dataset.data.reduce((a,b)=>a+b,0);
+                                        let value = context.raw;
+                                        let percentage = ((value / total) * 100).toFixed(2);
+                                        return `${context.label}: ${value.toLocaleString()} (${percentage}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            });
+    }
+
+    // Load awal
+    updateDashboard(monthEl.value, yearEl.value);
+
+    // Event filter bulan & tahun
+    monthEl.addEventListener('change', () => updateDashboard(monthEl.value, yearEl.value));
+    yearEl.addEventListener('change', () => updateDashboard(monthEl.value, yearEl.value));
 });
