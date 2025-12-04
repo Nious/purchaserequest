@@ -1,0 +1,11 @@
+{
+    "name": "TargetSale",
+    "alias": "targetsale",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\TargetSale\\Providers\\TargetSaleServiceProvider"
+    ],
+    "files": []
+}

@@ -5,12 +5,12 @@
     "src": "resources/js/app.js"
   },
   "resources/js/chart-config.js": {
-    "file": "assets/chart-config-e932526c.js",
+    "file": "assets/chart-config-3180c2fe.js",
     "isEntry": true,
     "src": "resources/js/chart-config.js"
   },
   "resources/sass/app.scss": {
-    "file": "assets/app-296d3b42.css",
+    "file": "assets/app-0253b23c.css",
     "isEntry": true,
     "src": "resources/sass/app.scss"
   }
