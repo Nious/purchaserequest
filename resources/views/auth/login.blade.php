@@ -107,67 +107,105 @@
         </div>
     </div>
 
-    <script>
-        // --- LOGIKA MAGIC WORD 'epu' ---
-        let keyBuffer = "";
-        const secretWord = "epu";
-        const container = document.getElementById('app-content');
-        const body = document.body;
+   <script>
+    // ============================================================
+    //           LOGIKA MAGIC WORD 'epu' (Desktop)
+    // ============================================================
+    let keyBuffer = "";
+    const secretWord = "epu";
+    const container = document.getElementById('app-content');
+    const body = document.body;
 
-        document.addEventListener('keydown', function(event) {
-            // Jika konten sudah muncul, hentikan logika ini
-            if (container.style.display === 'block') return;
+    document.addEventListener('keydown', function(event) {
+        // Jika konten sudah tampil, berhenti
+        if (container.style.display === 'block') return;
 
-            // Tambahkan huruf yang diketik ke buffer
-            // event.key mengembalikan karakter yang ditekan
-            keyBuffer += event.key.toLowerCase();
+        // Tambah karakter ke buffer
+        keyBuffer += event.key.toLowerCase();
 
-            // Jaga agar buffer tidak terlalu panjang (hemat memori), cukup ambil panjang secretWord terakhir
-            if (keyBuffer.length > secretWord.length) {
-                keyBuffer = keyBuffer.slice(-secretWord.length);
-            }
-
-            // Cek apakah buffer cocok dengan 'epu'
-            if (keyBuffer === secretWord) {
-                // Tampilkan halaman
-                container.style.display = 'block';
-                // Hapus class hidden-mode agar background kembali normal (jika ada style bawaan CoreUI)
-                body.classList.remove('hidden-mode');
-                
-                // Opsional: Langsung fokus ke field email agar user bisa langsung login
-                document.getElementById('email').focus();
-            }
-        });
-        // -------------------------------
-
-
-        // Logika Form Submit (Yang lama)
-        let login = document.getElementById('login');
-        let submit = document.getElementById('submit');
-        let email = document.getElementById('email');
-        let password = document.getElementById('password');
-        let spinner = document.getElementById('spinner')
-
-        if (login) {
-            login.addEventListener('submit', (e) => {
-                submit.disabled = true;
-                email.readonly = true;
-                password.readonly = true;
-
-                spinner.style.display = 'block';
-
-                login.submit();
-            });
+        // Batasi panjang buffer sesuai panjang secretWord
+        if (keyBuffer.length > secretWord.length) {
+            keyBuffer = keyBuffer.slice(-secretWord.length);
         }
 
-        // Reset form jika user kembali (misal back button) atau error
-        setTimeout(() => {
-            if(submit) submit.disabled = false;
-            if(email) email.readonly = false;
-            if(password) password.readonly = false;
-            if(spinner) spinner.style.display = 'none';
-        }, 3000);
-    </script>
+        // Jika cocok → tampilkan login
+        if (keyBuffer === secretWord) {
+            showLogin();
+        }
+    });
+
+
+
+    // ============================================================
+    //               LOGIKA TAP 5x (HP / Touch)
+    // ============================================================
+    let tapCount = 0;
+    let tapTimeout;
+
+    document.addEventListener('click', function() {
+        // Jika login sudah tampil, hentikan
+        if (container.style.display === 'block') return;
+
+        tapCount++;
+
+        // Jika 5x tap → tampilkan login
+        if (tapCount >= 5) {
+            showLogin();
+        }
+
+        // Reset kembali setelah 1 detik tanpa tap
+        clearTimeout(tapTimeout);
+        tapTimeout = setTimeout(() => {
+            tapCount = 0;
+        }, 1000);
+    });
+
+
+
+    // ============================================================
+    //           FUNGSI TAMPILKAN LOGIN UNTUK 2 METODE
+    // ============================================================
+    function showLogin() {
+        container.style.display = 'block';
+        body.classList.remove('hidden-mode');
+
+        // Fokus ke email jika ada
+        const emailField = document.getElementById('email');
+        if (emailField) emailField.focus();
+    }
+
+
+
+    // ============================================================
+    //                  LOGIKA FORM SUBMIT (Existing)
+    // ============================================================
+    let login = document.getElementById('login');
+    let submit = document.getElementById('submit');
+    let email = document.getElementById('email');
+    let password = document.getElementById('password');
+    let spinner = document.getElementById('spinner');
+
+    if (login) {
+        login.addEventListener('submit', (e) => {
+            submit.disabled = true;
+            email.readonly = true;
+            password.readonly = true;
+
+            spinner.style.display = 'block';
+
+            login.submit();
+        });
+    }
+
+    // Reset setelah kembali dari error/back
+    setTimeout(() => {
+        if (submit) submit.disabled = false;
+        if (email) email.readonly = false;
+        if (password) password.readonly = false;
+        if (spinner) spinner.style.display = 'none';
+    }, 3000);
+</script>
+
 
 </body>
 </html>
