@@ -153,9 +153,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Helper: Format Rupiah Singkat (cth: 1.5M, 500jt)
     const formatCompactNumber = (number) => {
         if (number >= 1000000000) {
-            return (number / 1000000000).toFixed(1) + 'M';
+            return (number / 1000000000).toFixed(1).replace('.', ',') + 'M';
         } else if (number >= 1000000) {
-            return (number / 1000000).toFixed(0) + 'jt';
+            return (number / 1000000).toFixed(1).replace('.', ',') + 'jt';
         }
         return number;
     };

@@ -19,7 +19,7 @@
             @endif
         </h3>
         <div>
-            @if ($purchase->status === 'pending')
+            @if ($purchase->status !== 'rejected')
                 <a href="{{ route('purchases.edit', $purchase->id) }}" class="btn btn-sm btn-warning me-2" id="edit-btn">
                     <i class="bi bi-pencil-square"></i> Edit
                 </a>
@@ -275,7 +275,7 @@
                                     <td class="text-end fw-bold">{{ format_currency($budgetTersedia) }}</td>
                                 </tr>
                                 <tr>
-                                    <th class="text-start text-muted">Over Budget (Diajukan)</th> 
+                                    <th class="text-start text-muted">Sisa Budget</th> 
                                     <td class="text-end fw-bold" style="color: {{ $sisaBudget < 0 ? 'red' : 'green' }}">
                                         {{ format_currency($sisaBudget) }} 
                                     </td>

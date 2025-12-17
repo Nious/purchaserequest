@@ -18,8 +18,8 @@ class HomeController extends Controller
         $year  = $request->get('year', Carbon::now()->year);
 
         $approved_budget = MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->sum('grandtotal');
 
         $purchases = Purchase::where('status', 'Approved')
@@ -42,8 +42,8 @@ class HomeController extends Controller
         $year  = $request->get('year', now()->year);
 
         $approved_budget = MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->sum('grandtotal');
 
         $purchases = Purchase::where('status', 'Approved')
@@ -68,8 +68,8 @@ class HomeController extends Controller
         $approvedPurchases = [];
 
         $totalBudget = MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->sum('grandtotal');
 
         $cumulativePurchase = 0;
@@ -103,8 +103,8 @@ class HomeController extends Controller
 
         $budgets = MasterBudget::with('department')
             ->where('status', 'Approved')
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
+            ->whereYear('periode_awal', $year)
+            ->whereMonth('periode_awal', $month)
             ->get();
 
         $grouped = $budgets->groupBy(function ($item) {
@@ -138,8 +138,8 @@ class HomeController extends Controller
         $year  = $request->get('year', now()->year);
 
         $budgets = MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->select('department_id', DB::raw('SUM(grandtotal) as total'))
             ->groupBy('department_id')
             ->with('department')

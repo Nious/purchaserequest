@@ -15,10 +15,24 @@
                 </a>
             @endif
         @endcan
+        {{-- @can('edit_purchases')
+         @if($data->status == 'pending')
+            <a href="{{ route('purchases.edit', $data->id) }}" class="dropdown-item">
+                <i class="bi bi-pencil mr-2 text-primary" style="line-height: 1;"></i> Edit
+            </a>
+         @endif
+        @endcan --}}
         @can('edit_purchases')
          @if($data->status == 'pending')
             <a href="{{ route('purchases.edit', $data->id) }}" class="dropdown-item">
                 <i class="bi bi-pencil mr-2 text-primary" style="line-height: 1;"></i> Edit
+            </a>
+         @endif
+        @endcan
+        @can('edit_purchases')
+         @if($data->status == 'approved')
+            <a href="{{ route('purchases.actual', $data->id) }}" class="dropdown-item">
+                <i class="bi bi-pencil mr-2 text-primary" style="line-height: 1;"></i> Input Actual
             </a>
          @endif
         @endcan

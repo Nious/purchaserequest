@@ -133,9 +133,9 @@
 
         <div class="dropdown-menu dropdown-menu-right pt-0">
             <div class="dropdown-header bg-light py-2"><strong>Account</strong></div>
-            <a class="dropdown-item" href="{{ route('profile.edit') }}">
+            {{-- <a class="dropdown-item" href="{{ route('profile.edit') }}">
                 <i class="mfe-2 bi bi-person" style="font-size: 1.2rem;"></i> Profile
-            </a>
+            </a> --}}
             <a class="dropdown-item" href="#"
                onclick="event.preventDefault(); document.getElementById('logout-form').submit();">
                 <i class="mfe-2 bi bi-box-arrow-left" style="font-size: 1.2rem;"></i> Logout
