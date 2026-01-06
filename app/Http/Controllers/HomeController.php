@@ -7,7 +7,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Modules\Purchase\Entities\Purchase;
 use Modules\Budget\Entities\MasterBudget;
-// ✅ PERBAIKAN: Tambahkan import ini agar tidak error 500
 use Modules\TargetSale\Entities\TargetSale; 
 
 class HomeController extends Controller
@@ -17,22 +16,35 @@ class HomeController extends Controller
         $month = $request->get('month', Carbon::now()->month);
         $year  = $request->get('year', Carbon::now()->year);
 
+        // 1. Total Budget Disetujui
         $approved_budget = MasterBudget::where('status', 'Approved')
             ->whereMonth('periode_awal', $month)
             ->whereYear('periode_awal', $year)
             ->sum('grandtotal');
 
+        // 2. Total Pembelian Disetujui (Penggunaan Budget)
         $purchases = Purchase::where('status', 'Approved')
             ->whereMonth('date', $month)
             ->whereYear('date', $year)
             ->sum('total_amount');
 
+        // 3. Sisa Budget (Budget - Pembelian Approved)
+        $remaining_budget = $approved_budget - $purchases;
+
+        // 4. Total PR Pending (Belum diapprove)
+        $pending_purchases = Purchase::where('status', 'Pending')
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->sum('total_amount');
+
         return view('home', [
-            'approved_budget' => $approved_budget,
-            'purchases'       => $purchases,
-            'month'           => $month,
-            'year'            => $year,
-            'monthName'       => Carbon::create()->month($month)->translatedFormat('F'),
+            'approved_budget'   => $approved_budget,
+            'purchases'         => $purchases,
+            'remaining_budget'  => $remaining_budget,  // <-- Data Baru
+            'pending_purchases' => $pending_purchases, // <-- Data Baru
+            'month'             => $month,
+            'year'              => $year,
+            'monthName'         => Carbon::create()->month($month)->translatedFormat('F'),
         ]);
     }
 
@@ -51,9 +63,19 @@ class HomeController extends Controller
             ->whereYear('date', $year)
             ->sum('total_amount');
 
+        // Hitung Data Baru
+        $remaining_budget = $approved_budget - $purchases;
+
+        $pending_purchases = Purchase::where('status', 'Pending')
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->sum('total_amount');
+
         return response()->json([
-            'approved_budget' => $approved_budget,
-            'purchases'       => $purchases,
+            'approved_budget'   => $approved_budget,
+            'purchases'         => $purchases,
+            'remaining_budget'  => $remaining_budget,  // <-- Kirim ke JS
+            'pending_purchases' => $pending_purchases, // <-- Kirim ke JS
         ]);
     }
 
@@ -162,7 +184,6 @@ class HomeController extends Controller
         ]);
     }
 
-    // --- METHOD BARU (DENGAN FIX IMPORT) ---
     public function targetVsPurchaseChart(Request $request)
     {
         $year = $request->get('year', now()->year);
@@ -172,20 +193,15 @@ class HomeController extends Controller
         $actualPurchases = []; 
 
         for ($month = 1; $month <= 12; $month++) {
-            // 1. Label Bulan
             $labels[] = Carbon::createFromDate($year, $month, 1)->translatedFormat('M');
 
-            // 2. Ambil Target Sales bulan ini
-            // Pastikan model TargetSale sudah di-import di atas
             $targetAmount = TargetSale::where('year', $year)
                 ->where('month', $month)
                 ->sum('target_amount');
             
-            // Hitung 0.65% dari Target
             $limit = $targetAmount * 0.0065; 
             $targetLimits[] = $limit;
 
-            // 3. Ambil Total Purchase Request (Approved) bulan ini
             $purchaseAmount = Purchase::where('status', 'Approved')
                 ->whereYear('date', $year)
                 ->whereMonth('date', $month)

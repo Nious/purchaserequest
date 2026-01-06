@@ -36,15 +36,14 @@
     {{-- 1. INFO CARDS (STATISTIK UTAMA) --}}
     @can('show_total_stats')
     <div class="row align-items-center mb-4">
-        {{-- Approved Budget --}}
-        <div class="col-md-4 col-lg-3">
+        {{-- Card 1: Approved Budget --}}
+        <div class="col-md-6 col-lg-3 mb-2">
             <div class="card border-0">
                 <div class="card-body p-0 d-flex align-items-center shadow-sm">
                     <div class="bg-gradient-success p-4 mfe-3 rounded-left">
                         <i class="bi bi-cash-coin font-2xl"></i>
                     </div>
                     <div>
-                        {{-- Nilai awal diisi dari controller, nanti diupdate JS --}}
                         <div class="text-value text-success" id="approvedBudget">{{ format_currency($approved_budget ?? 0) }}</div>
                         <div class="text-muted text-uppercase font-weight-bold small">Approved Budget</div>
                     </div>
@@ -52,8 +51,8 @@
             </div>
         </div>
 
-        {{-- Purchases --}}
-        <div class="col-md-4 col-lg-3">
+        {{-- Card 2: Purchases (Approved) --}}
+        <div class="col-md-6 col-lg-3 mb-2">
             <div class="card border-0">
                 <div class="card-body p-0 d-flex align-items-center shadow-sm">
                     <div class="bg-gradient-warning p-4 mfe-3 rounded-left">
@@ -61,7 +60,37 @@
                     </div>
                     <div>
                         <div class="text-value text-warning" id="totalPurchase">{{ format_currency($purchases ?? 0) }}</div>
-                        <div class="text-muted text-uppercase font-weight-bold small">Purchases</div>
+                        <div class="text-muted text-uppercase font-weight-bold small">Total Purchase (Approved)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Card 3: Remaining Budget --}}
+        <div class="col-md-6 col-lg-3 mb-2">
+            <div class="card border-0">
+                <div class="card-body p-0 d-flex align-items-center shadow-sm">
+                    <div class="bg-gradient-info p-4 mfe-3 rounded-left">
+                        <i class="bi bi-wallet2 font-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-value text-info" id="remainingBudget">{{ format_currency($remaining_budget ?? 0) }}</div>
+                        <div class="text-muted text-uppercase font-weight-bold small">Remaining Budget</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{-- Card 4: Pending Purchases --}}
+        <div class="col-md-6 col-lg-3 mb-2">
+            <div class="card border-0">
+                <div class="card-body p-0 d-flex align-items-center shadow-sm">
+                    <div class="bg-gradient-danger p-4 mfe-3 rounded-left">
+                        <i class="bi bi-hourglass-split font-2xl"></i>
+                    </div>
+                    <div>
+                        <div class="text-value text-danger" id="pendingPurchases">{{ format_currency($pending_purchases ?? 0) }}</div>
+                        <div class="text-muted text-uppercase font-weight-bold small">Pending Approval</div>
                     </div>
                 </div>
             </div>
@@ -72,7 +101,7 @@
     @can('show_weekly_sales_purchases|show_month_overview')
     <div class="row mb-4">
         
-        {{-- 2. CHART BARU: MONITORING TAHUNAN (TARGET VS PURCHASE) --}}
+        {{-- 2. CHART MIXED: TARGET VS PURCHASE (TAHUNAN) --}}
         <div class="col-12 mb-4">
             <div class="card border-0 shadow-sm">
                 <div class="card-header fw-bold">
@@ -84,13 +113,13 @@
                         <canvas id="targetVsPurchaseChart"></canvas>
                     </div>
                     <small class="text-muted mt-2 d-block text-center">
-                        *Garis merah putus-putus menandakan batas aman (0.65% dari Target Sales). Batang biru adalah realisasi Purchase Request.
+                        *Garis merah putus-putus menandakan batas aman (0.65% dari Target Sales). Batang biru adalah realisasi Purchase Request (Approved).
                     </small>
                 </div>
             </div>
         </div>
 
-        {{-- 3. CHART HARIAN: BUDGET VS PURCHASE (BULAN INI) --}}
+        {{-- 3. CHART LINE: HARIAN (BULAN INI) --}}
         @can('show_weekly_sales_purchases')
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm h-100">
@@ -98,7 +127,6 @@
                     Budget & Purchases Daily Trend (<span id="monthLabel">{{ \Carbon\Carbon::create()->month($month ?? date('n'))->translatedFormat('F') }}</span>)
                 </div>
                 <div class="card-body">
-                    {{-- ✅ PERBAIKAN: Tambahkan wrapper dengan tinggi fix (misal 300px) --}}
                     <div style="position: relative; height: 300px; width: 100%;">
                         <canvas id="budgetPurchasesChart"></canvas>
                     </div>
@@ -115,8 +143,7 @@
                     Budget Share by Department
                 </div>
                 <div class="card-body d-flex justify-content-center align-items-center">
-                    {{-- ✅ PERBAIKAN: Kurangi tinggi container dari 420px menjadi 300px --}}
-                    <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                    <div class="chart-container" style="position: relative; height:300px; width:100%;">
                         <canvas id="budgetDepartmentChart"></canvas>
                     </div>
                 </div>
@@ -155,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (number >= 1000000000) {
             return (number / 1000000000).toFixed(1).replace('.', ',') + 'M';
         } else if (number >= 1000000) {
-            return (number / 1000000).toFixed(1).replace('.', ',') + 'jt';
+            return (number / 1000000).toFixed(0) + 'jt';
         }
         return number;
     };
@@ -171,15 +198,22 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(res => res.json())
             .then(data => {
                 const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
+                
                 const budgetEl = document.getElementById('approvedBudget');
                 const purchaseEl = document.getElementById('totalPurchase');
+                const remainingEl = document.getElementById('remainingBudget');
+                const pendingEl = document.getElementById('pendingPurchases');
                 
                 if(budgetEl) budgetEl.innerText = formatter.format(data.approved_budget);
                 if(purchaseEl) purchaseEl.innerText = formatter.format(data.purchases);
+                if(remainingEl) remainingEl.innerText = formatter.format(data.remaining_budget);
+                if(pendingEl) pendingEl.innerText = formatter.format(data.pending_purchases);
             })
             .catch(error => console.error('Error fetching totals:', error));
 
         // 2️⃣ API: Chart Baru (Target vs Purchase - Tahunan)
+        // Note: Chart ini berbasis tahun (bulan 1-12), jadi perubahan bulan di filter tidak mempengaruhi sumbu X, 
+        // tapi mempengaruhi data jika Anda ingin highlight bulan tertentu (opsional). Di sini kita load data setahun penuh.
         fetch("{{ route('home.targetVsPurchaseChart') }}?year=" + year)
             .then(res => res.json())
             .then(data => {
@@ -291,20 +325,6 @@ document.addEventListener('DOMContentLoaded', function() {
                         responsive: true, 
                         maintainAspectRatio: false,
                         interaction: { mode: 'index', intersect: false },
-                        plugins: {
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) label += ': ';
-                                        if (context.parsed.y !== null) {
-                                            label += new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(context.parsed.y);
-                                        }
-                                        return label;
-                                    }
-                                }
-                            }
-                        },
                         scales: {
                             y: {
                                 beginAtZero: true,
