@@ -134,6 +134,35 @@
 </li>
 @endcan
 
+<li class="c-sidebar-nav-item c-sidebar-nav-dropdown {{ request()->routeIs('target_sales.*') ? 'c-show' : '' }}">
+    
+    <a class="c-sidebar-nav-link c-sidebar-nav-dropdown-toggle" href="#">
+        {{-- Ganti icon sesuai selera, misal bi-graph-up-arrow --}}
+        <i class="c-sidebar-nav-icon bi bi-graph-up" style="line-height: 1;"></i> Target Sales
+    </a>
+
+    <ul class="c-sidebar-nav-dropdown-items">
+        {{-- Menu List --}}
+        <li class="c-sidebar-nav-item">
+            <a class="c-sidebar-nav-link {{ request()->routeIs('target_sales.*') ? 'c-active' : '' }}" 
+               href="{{ route('target_sales.index') }}"> {{-- Pastikan route ini ada --}}
+                <i class="c-sidebar-nav-icon bi bi-collection" style="line-height: 1;"></i> List Target Sales
+            </a>
+        </li>
+        
+        {{-- Menu Create --}}
+        @can('create_target_sales')
+        <li class="c-sidebar-nav-item">
+            <a class="c-sidebar-nav-link {{ request()->routeIs('target_sales.*') ? 'c-active' : '' }}" 
+               href="{{ route('target_sales.create') }}">
+                <i class="c-sidebar-nav-icon bi bi-plus-circle" style="line-height: 1;"></i> Create Target Sales
+            </a>
+        </li>
+        @endcan
+        
+    </ul>
+</li>
+
 
 
 @can('access_reports')

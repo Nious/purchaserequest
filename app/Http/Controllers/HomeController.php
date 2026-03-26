@@ -5,14 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Modules\Expense\Entities\Expense;
 use Modules\Purchase\Entities\Purchase;
-use Modules\Purchase\Entities\PurchasePayment;
-use Modules\Sale\Entities\Sale;
-use Modules\Sale\Entities\SalePayment;
 use Modules\Budget\Entities\MasterBudget;
-use Modules\SalesReturn\Entities\SaleReturnPayment;
-use Modules\PurchasesReturn\Entities\PurchaseReturnPayment;
+use Modules\TargetSale\Entities\TargetSale; 
 
 class HomeController extends Controller
 {
@@ -21,14 +16,46 @@ class HomeController extends Controller
         $month = $request->get('month', Carbon::now()->month);
         $year  = $request->get('year', Carbon::now()->year);
 
-        $sales = Sale::completed()
+        // 1. Total Budget Disetujui
+        $approved_budget = MasterBudget::where('status', 'Approved')
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
+            ->sum('grandtotal');
+
+        // 2. Total Pembelian Disetujui (Penggunaan Budget)
+        $purchases = Purchase::where('status', 'Approved')
             ->whereMonth('date', $month)
             ->whereYear('date', $year)
             ->sum('total_amount');
 
+        // 3. Sisa Budget (Budget - Pembelian Approved)
+        $remaining_budget = $approved_budget - $purchases;
+
+        // 4. Total PR Pending (Belum diapprove)
+        $pending_purchases = Purchase::where('status', 'Pending')
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->sum('total_amount');
+
+        return view('home', [
+            'approved_budget'   => $approved_budget,
+            'purchases'         => $purchases,
+            'remaining_budget'  => $remaining_budget,  // <-- Data Baru
+            'pending_purchases' => $pending_purchases, // <-- Data Baru
+            'month'             => $month,
+            'year'              => $year,
+            'monthName'         => Carbon::create()->month($month)->translatedFormat('F'),
+        ]);
+    }
+
+    public function totalBudgetPurchase(Request $request)
+    {
+        $month = $request->get('month', now()->month);
+        $year  = $request->get('year', now()->year);
+
         $approved_budget = MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->sum('grandtotal');
 
         $purchases = Purchase::where('status', 'Approved')
@@ -36,12 +63,19 @@ class HomeController extends Controller
             ->whereYear('date', $year)
             ->sum('total_amount');
 
-        return view('home', [
-            'approved_budget' => $approved_budget,
-            'purchases'       => $purchases,
-            'month'           => $month,
-            'year'            => $year,
-            'monthName'       => Carbon::create()->month($month)->translatedFormat('F'),
+        // Hitung Data Baru
+        $remaining_budget = $approved_budget - $purchases;
+
+        $pending_purchases = Purchase::where('status', 'Pending')
+            ->whereMonth('date', $month)
+            ->whereYear('date', $year)
+            ->sum('total_amount');
+
+        return response()->json([
+            'approved_budget'   => $approved_budget,
+            'purchases'         => $purchases,
+            'remaining_budget'  => $remaining_budget,  // <-- Kirim ke JS
+            'pending_purchases' => $pending_purchases, // <-- Kirim ke JS
         ]);
     }
 
@@ -55,30 +89,26 @@ class HomeController extends Controller
         $approvedBudgets = [];
         $approvedPurchases = [];
 
-        // Ambil total budget yang sudah disetujui untuk bulan ini
-        $totalBudget = \Modules\Budget\Entities\MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+        $totalBudget = MasterBudget::where('status', 'Approved')
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->sum('grandtotal');
 
         $cumulativePurchase = 0;
 
         for ($day = 1; $day <= $daysInMonth; $day++) {
-            $date = Carbon::createFromDate($year, $month, $day);
             $labels[] = $day;
 
-            // Ambil total purchase APPROVED hanya untuk bulan & hari ini
-            $dailyPurchase = \Modules\Purchase\Entities\Purchase::where('status', 'Approved')
+            $dailyPurchase = Purchase::where('status', 'Approved')
                 ->whereMonth('date', $month)
                 ->whereYear('date', $year)
                 ->whereDay('date', $day)
                 ->sum('total_amount');
 
-            // Tetap akumulatif di bulan itu saja
             $cumulativePurchase += $dailyPurchase;
 
             $approvedPurchases[] = $cumulativePurchase;
-            $approvedBudgets[] = max($totalBudget - $cumulativePurchase, 0); // tidak boleh negatif
+            $approvedBudgets[] = max($totalBudget - $cumulativePurchase, 0);
         }
 
         return response()->json([
@@ -88,21 +118,18 @@ class HomeController extends Controller
         ]);
     }
 
-
-
     public function budgetByDepartmentChart(Request $request)
     {
         $month = $request->get('month', now()->month);
         $year  = $request->get('year', now()->year);
 
-        $budgets = \Modules\Budget\Entities\MasterBudget::with('department')
+        $budgets = MasterBudget::with('department')
             ->where('status', 'Approved')
-            ->whereYear('created_at', $year)
-            ->whereMonth('created_at', $month)
+            ->whereYear('periode_awal', $year)
+            ->whereMonth('periode_awal', $month)
             ->get();
 
         $grouped = $budgets->groupBy(function ($item) {
-            // Jika tidak ada department, beri label "Lain-lain"
             return $item->department ? $item->department->department_name : 'Budget Lain-lain';
         });
 
@@ -114,10 +141,9 @@ class HomeController extends Controller
             $data[] = $items->sum('grandtotal');
         }
 
-        // Jika tidak ada data sama sekali, tambahkan placeholder supaya chart tetap muncul
         if (empty($labels)) {
             $labels = ['No Data'];
-            $data = [1]; // Chart.js butuh setidaknya 1 data
+            $data = [1];
         }
 
         return response()->json([
@@ -126,8 +152,6 @@ class HomeController extends Controller
         ]);
     }
 
-
-
     public function currentMonthChart(Request $request)
     {
         abort_if(!request()->ajax(), 404);
@@ -135,27 +159,23 @@ class HomeController extends Controller
         $month = $request->get('month', now()->month);
         $year  = $request->get('year', now()->year);
 
-        // Ambil total budget per department untuk bulan & tahun yang dipilih
-        $budgets = \Modules\Budget\Entities\MasterBudget::where('status', 'Approved')
-            ->whereMonth('created_at', $month)
-            ->whereYear('created_at', $year)
+        $budgets = MasterBudget::where('status', 'Approved')
+            ->whereMonth('periode_awal', $month)
+            ->whereYear('periode_awal', $year)
             ->select('department_id', DB::raw('SUM(grandtotal) as total'))
             ->groupBy('department_id')
             ->with('department')
             ->get();
 
-        $labels = $budgets->map(fn($b) => $b->department->name)->toArray();
+        $labels = $budgets->map(fn($b) => $b->department->name ?? 'Unknown')->toArray();
         $data = $budgets->pluck('total')->toArray();
 
-        // Jika tidak ada data, tampilkan placeholder 1 data kosong supaya chart tetap muncul
         if(empty($labels)) {
             $labels = ['No Data'];
-            $data = [1]; // Chart membutuhkan setidaknya 1 data
+            $data = [1];
         }
 
         $total = array_sum($data);
-
-        // Hitung persentase
         $percentages = array_map(fn($value) => $total > 0 ? round(($value / $total) * 100, 2) : 0, $data);
 
         return response()->json([
@@ -164,4 +184,36 @@ class HomeController extends Controller
         ]);
     }
 
+    public function targetVsPurchaseChart(Request $request)
+    {
+        $year = $request->get('year', now()->year);
+
+        $labels = [];
+        $targetLimits = []; 
+        $actualPurchases = []; 
+
+        for ($month = 1; $month <= 12; $month++) {
+            $labels[] = Carbon::createFromDate($year, $month, 1)->translatedFormat('M');
+
+            $targetAmount = TargetSale::where('year', $year)
+                ->where('month', $month)
+                ->sum('target_amount');
+            
+            $limit = $targetAmount * 0.0065; 
+            $targetLimits[] = $limit;
+
+            $purchaseAmount = Purchase::where('status', 'Approved')
+                ->whereYear('date', $year)
+                ->whereMonth('date', $month)
+                ->sum('total_amount');
+            
+            $actualPurchases[] = $purchaseAmount;
+        }
+
+        return response()->json([
+            'labels' => $labels,
+            'targetLimits' => $targetLimits,
+            'actualPurchases' => $actualPurchases,
+        ]);
+    }
 }

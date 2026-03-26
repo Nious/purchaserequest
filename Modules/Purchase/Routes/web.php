@@ -48,6 +48,13 @@ Route::group(['middleware' => 'auth'], function () {
     Route::post('/purchases/{id}/update-status', [PurchaseController::class, 'updateStatus'])
     ->name('purchases.updateStatus');
 
+    Route::get('/purchases/{purchase}/input-actual', [PurchaseController::class, 'actual'])
+        ->name('purchases.actual');
+
+    Route::patch('/purchases/{purchase}/actual', [PurchaseController::class, 'updateActual'])
+    ->name('purchases.updateActual');
+
+
     Route::get('/purchases/{id}/print', [PurchaseController::class, 'print'])
     ->name('purchases.print');
 

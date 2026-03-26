@@ -16,5 +16,6 @@
     "Reports": true,
     "Department": true,
     "Budget": true,
-    "Approval": true
+    "Approval": true,
+    "TargetSale": true
 }

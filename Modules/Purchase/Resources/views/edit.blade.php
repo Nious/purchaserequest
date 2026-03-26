@@ -12,7 +12,8 @@
 
 @php
     $departmentId = $purchase->department_id ?? '';
-    $purchaseDateValue = old('date', $purchase->date);
+    // Format tanggal untuk input date HTML5
+    $purchaseDateValue = old('date', \Carbon\Carbon::parse($purchase->date)->format('Y-m-d'));
 @endphp
 
 @section('content')
@@ -20,7 +21,7 @@
     {{-- Search Product --}}
     <div class="row">
         <div class="col-12">
-            <livewire:search-product/>
+            <livewire:search-product :departmentId="$departmentId" :date="$purchaseDateValue" />
         </div>
     </div>
 
@@ -31,7 +32,6 @@
                 <div class="card-body">
                     @include('utils.alerts')
 
-                    {{-- === FORM YANG BENAR === --}}
                     <form id="purchase-form" action="{{ route('purchases.update', $purchase->id) }}" method="POST">
                         @csrf
                         @method('PATCH')
@@ -71,7 +71,7 @@
                             <div class="col-lg-4 mt-3">
                                 <div class="form-group">
                                     <label for="date">Date <span class="text-danger">*</span></label>
-                                    <input type="date" class="form-control" name="date" required value="{{ $purchase->date }}">
+                                    <input type="date" class="form-control" name="date" required value="{{ $purchaseDateValue }}">
                                 </div>
                             </div>
                         </div>
@@ -81,6 +81,51 @@
                             <label for="note">Note (If Needed)</label>
                             <textarea name="note" id="note" rows="5" class="form-control">{{ $purchase->note }}</textarea>
                         </div>
+
+                        {{-- <div class="row">
+                            <div class="">
+                                <div class="card shadow-sm border-1">
+                                    <div class="card-header bg-dark text-white fw-bold">
+                                        <i class="bi bi-box-seam me-2"></i>Products Master Data
+                                    </div>
+                                    <div class="card-body p-2">
+                                        <div class="table-responsive">
+                                            <table class="table table-sm table-hover align-middle mb-0">
+                                                <thead class="table-light">
+                                                    <tr>
+                                                        <th>Product</th>
+                                                        <th>Code</th>
+                                                        <th>Price</th>
+                                                        <th>UOM</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($products as $product)
+                                                        <tr>
+                                                            <td class="fw-semibold">{{ $product->product_name }}</td>
+                                                            <td>
+                                                                <span class="badge bg-secondary text-black">{{ $product->product_code ?? '-' }}</span>
+                                                            </td>
+                                                            <td>
+                                                                <span class="text-success fw-bold">
+                                                                    Rp{{ number_format($product->product_price, 0, ',', '.') }}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                <span class="badge bg-info text-white">{{ $product->product_unit ?? '-' }}</span>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <small class="text-muted d-block mt-2">
+                                            Data produk ini hanya sebagai referensi. Tidak dapat diubah di sini. List Produk Akan Terupdate Jika PR Sudah Disimpan (Tidak Realtime)
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div> --}}
 
                         {{-- Product Cart --}}
                         <livewire:product-cart :cartInstance="'purchase'" :data="$purchase" :departmentId="$departmentId" :purchaseDate="$purchaseDateValue" />
@@ -92,7 +137,7 @@
 
                                 <table class="table table-borderless">
                                     <tr>
-                                        <th class="text-start text-muted">Grand Total</th>
+                                        <th class="text-start text-muted">Estimate Grand Total</th>
                                         <td class="text-end fw-bold" id="grand_total_display">
                                             Rp{{ number_format($purchase->total_amount ?? 0, 0, ',', '.') }}
                                         </td>
@@ -124,7 +169,7 @@
                                 <i class="bi bi-save"></i> Update Purchase
                             </button>
                         </div>
-                    </form> {{-- Tutup form dengan benar --}}
+                    </form>
                 </div>
             </div>
         </div>
@@ -133,40 +178,64 @@
 @endsection
 
 
-@push('page_scripts')
+@push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
 <script>
+// Fungsi Helper Format Rupiah
+const formatRupiah = (angka) => {
+    let num = Number(angka);
+    if (isNaN(num)) num = 0;
+    return new Intl.NumberFormat('id-ID', { 
+        style: 'currency', 
+        currency: 'IDR', 
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+    }).format(num);
+};
+
+// Variabel Global untuk menyimpan data budget luar departemen (Over Budget)
+let globalNonDeptBudgetRemaining = 0;
+
 document.addEventListener('livewire:init', () => {
     Livewire.on('update-budget-fields', (data) => {
         const payload = Array.isArray(data) ? data[0] : data;
         console.log('Data diterima dari Livewire (edit):', payload);
 
-        const formatRupiah = (angka) => {
-            const num = Number(angka) || 0;
-            return 'Rp' + num.toLocaleString('id-ID', { maximumFractionDigits: 0 });
-        };
+        const grandTotalEl = document.getElementById('grand_total_display');
+        const budgetEl = document.getElementById('budget_display');
+        const sisaEl = document.getElementById('sisa_budget_display');
 
-        document.getElementById('grand_total_display').innerText = formatRupiah(payload.total_amount);
-        document.getElementById('budget_display').innerText = formatRupiah(payload.master_budget_value);
-        const sisa = document.getElementById('sisa_budget_display');
-        sisa.innerText = formatRupiah(payload.master_budget_remaining);
+        const total = Number(payload.total_amount);
+        const budget = Number(payload.master_budget_value);
+        const remaining = Number(payload.master_budget_remaining);
 
-        if (payload.master_budget_remaining < 0) {
-            sisa.classList.add('text-danger', 'fw-bold');
-            sisa.classList.remove('text-success');
+        // Update Tampilan
+        grandTotalEl.innerText = formatRupiah(total);
+        budgetEl.innerText = formatRupiah(budget);
+        sisaEl.innerText = formatRupiah(remaining);
+
+        // Update Warna Sisa Budget
+        if (remaining < 0) {
+            sisaEl.classList.add('text-danger', 'fw-bold');
+            sisaEl.classList.remove('text-success');
         } else {
-            sisa.classList.remove('text-danger', 'fw-bold');
-            sisa.classList.add('text-success');
+            sisaEl.classList.remove('text-danger', 'fw-bold');
+            sisaEl.classList.add('text-success');
         }
 
-        document.getElementById('total_amount').value = payload.total_amount;
-        document.getElementById('master_budget_value').value = payload.master_budget_value;
-        document.getElementById('master_budget_remaining').value = payload.master_budget_remaining;
+        // Update Input Hidden
+        document.getElementById('total_amount').value = total;
+        document.getElementById('master_budget_value').value = budget;
+        document.getElementById('master_budget_remaining').value = remaining;
+
+        // Simpan data Over Budget
+        globalNonDeptBudgetRemaining = Number(payload.non_dept_budget_remaining) || 0;
     });
 });
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Listener perubahan tanggal untuk Livewire
     const dateInput = document.querySelector('input[name="date"]');
     if (dateInput) {
         dateInput.addEventListener('change', function() {
@@ -175,14 +244,12 @@ document.addEventListener('DOMContentLoaded', function () {
             Livewire.dispatch('dateChanged', { date: newDate });
         });
     }
-});
 
-document.addEventListener('DOMContentLoaded', function () {
     const form = document.getElementById('purchase-form');
     const status = '{{ strtolower($purchase->status) }}';
 
-    if (status === 'approved' || status === 'rejected') {
-
+    // Disable form jika status sudah final
+    if (status === 'rejected') {
         form.querySelectorAll('input, textarea, select').forEach(element => {
             element.disabled = true;
         });
@@ -192,9 +259,10 @@ document.addEventListener('DOMContentLoaded', function () {
             submitButton.style.display = 'none';
         }
 
-        const searchProduct = document.querySelector('livewire\\:search-product');
-        if (searchProduct) {
-            searchProduct.style.display = 'none';
+        // Sembunyikan elemen pencarian livewire
+        const searchContainer = document.querySelector('.row > .col-12');
+        if(searchContainer && searchContainer.querySelector('input[wire\\:model]')) {
+             searchContainer.style.display = 'none';
         }
 
         Swal.fire({
@@ -206,29 +274,103 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // === LOGIKA SUBMIT (SAMA DENGAN CREATE) ===
     form.addEventListener('submit', function (e) {
         e.preventDefault();
 
-        if (status !== 'pending') {
+        // Cek status lagi untuk keamanan
+        if (status === 'rejected') {
              Swal.fire('Gagal', 'Data ini tidak dapat diubah lagi.', 'error');
              return;
         }
 
-        Swal.fire({
-            title: 'Edit Purchase Request?',
-            text: 'Apakah kamu yakin mau mengedit data ini?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Ya, lanjut edit',
-            cancelButtonText: 'Tidak',
-            reverseButtons: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-        }).then((result) => {
-            if (result.isConfirmed) {
-                form.submit();
+        const totalAmount = Number(document.getElementById('total_amount').value);
+        const remaining = Number(document.getElementById('master_budget_remaining').value);
+
+        // 1. Cek Keranjang Kosong
+        if (totalAmount <= 0) {
+            Swal.fire({
+                title: 'Keranjang Kosong!',
+                text: 'Anda harus menambahkan setidaknya satu produk.',
+                icon: 'error',
+                confirmButtonColor: '#d33',
+            });
+            return;
+        }
+
+        // 2. Cek apakah Melebihi Budget Departemen?
+        if (remaining < 0) {
+            const defisit = Math.abs(remaining); // Kekurangan dana
+            
+            // Hitung: Sisa Budget Dept (Minus) + Sisa Saldo Over Budget (Positif)
+            const kalkulasiAkhir = remaining + globalNonDeptBudgetRemaining;
+            
+            const defisitRp = formatRupiah(defisit);
+            const saldoOverBudgetRp = formatRupiah(globalNonDeptBudgetRemaining);
+
+            // A. Jika Dana Over Budget JUGA TIDAK CUKUP
+            if (kalkulasiAkhir < 0) {
+                Swal.fire({
+                    title: 'Dana Tidak Mencukupi!',
+                    html: `
+                        Budget Departemen Kurang: <b class="text-danger">${defisitRp}</b><br>
+                        Saldo Over Budget Tersedia: <b>${saldoOverBudgetRp}</b><br><br>
+                        Total dana (Dept + Over Budget) masih kurang <b>${formatRupiah(Math.abs(kalkulasiAkhir))}</b>. <br>Anda tidak dapat memperbarui data ini.
+                    `,
+                    icon: 'error',
+                    confirmButtonText: 'Mengerti',
+                    confirmButtonColor: '#d33',
+                });
+                return; // Stop
+            } 
+            
+            // B. Jika Dana Over Budget CUKUP
+            else {
+                Swal.fire({
+                    title: 'Budget Departemen Habis!',
+                    html: `
+                        Total PR melebihi budget departemen sebesar <b class="text-danger">${defisitRp}</b>.<br>
+                        Akan menggunakan dana <b>Over Budget</b> (Tersedia: ${saldoOverBudgetRp}).<br><br>
+                        Apakah Anda yakin ingin memperbarui data ini?
+                    `,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Gunakan Over Budget',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Tambahkan penanda over budget
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = 'confirmed_over_budget';
+                        input.value = '1';
+                        form.appendChild(input);
+
+                        form.submit(); // Lanjut Submit
+                    }
+                });
             }
-        });
+        } 
+        // 3. Jika Budget Cukup (Normal)
+        else {
+            Swal.fire({
+                title: 'Konfirmasi Perubahan',
+                text: 'Apakah kamu yakin ingin menyimpan perubahan pada data ini?',
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Simpan',
+                cancelButtonText: 'Batal',
+                reverseButtons: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    form.submit();
+                }
+            });
+        }
     });
 });
 </script>
